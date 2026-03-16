@@ -1,0 +1,501 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+
+import '../core/network/api_client.dart';
+import '../core/network/token_storage.dart';
+import '../repositories/video_repository.dart';
+import '../widgets/hls_player.dart';
+
+class VideoDetailScreen extends StatefulWidget {
+  final int videoId;
+
+  const VideoDetailScreen({super.key, required this.videoId});
+
+  @override
+  State<VideoDetailScreen> createState() => _VideoDetailScreenState();
+}
+
+class _VideoDetailScreenState extends State<VideoDetailScreen> {
+  late final VideoRepository videoRepository;
+
+  bool loading = true;
+  bool actionLoading = false;
+  String? error;
+  Map<String, dynamic>? video;
+  Map<String, dynamic>? playback;
+  Timer? pollingTimer;
+  bool _requestInFlight = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final dio = Dio();
+    final storage = TokenStorage();
+    ApiClient(dio, storage);
+
+    videoRepository = VideoRepository(dio);
+    loadVideo();
+  }
+
+  Future<void> loadVideo() async {
+    if (_requestInFlight) return;
+    _requestInFlight = true;
+
+    try {
+      final detail = await videoRepository.getVideo(
+        widget.videoId,
+        consistent: true,
+      );
+
+      Map<String, dynamic>? playbackData;
+
+      final status = detail['status']?.toString();
+      final hlsReady = detail['hls_ready'] == true;
+
+      if (status == 'ready' || hlsReady) {
+        playbackData = await videoRepository.getPlayback(
+          widget.videoId,
+          consistent: true,
+        );
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        video = detail;
+        playback = playbackData;
+        error = null;
+        loading = false;
+      });
+
+      _configurePolling(status);
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        error =
+            e.response?.data?.toString() ?? e.message ?? 'Failed to load video';
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        error = 'Failed to load video: $e';
+        loading = false;
+      });
+    } finally {
+      _requestInFlight = false;
+    }
+  }
+
+  void _configurePolling(String? status) {
+    final shouldPoll =
+        status == 'uploading' ||
+        status == 'uploaded' ||
+        status == 'processing';
+
+    if (!shouldPoll) {
+      pollingTimer?.cancel();
+      pollingTimer = null;
+      return;
+    }
+
+    if (pollingTimer != null && pollingTimer!.isActive) {
+      return;
+    }
+
+    pollingTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => loadVideo(),
+    );
+  }
+
+  Future<void> editVideo() async {
+    final currentVideo = video;
+    if (currentVideo == null || actionLoading) return;
+
+    final titleController = TextEditingController(
+      text: currentVideo['title']?.toString() ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: currentVideo['description']?.toString() ?? '',
+    );
+    String selectedVisibility =
+        currentVideo['visibility']?.toString() ?? 'private';
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit video'),
+          content: StatefulBuilder(
+            builder: (context, setModalState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Title',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descriptionController,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedVisibility,
+                      items: const [
+                        DropdownMenuItem(value: 'private', child: Text('private')),
+                        DropdownMenuItem(value: 'public', child: Text('public')),
+                        DropdownMenuItem(value: 'unlisted', child: Text('unlisted')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setModalState(() {
+                            selectedVisibility = value;
+                          });
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Visibility',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop({
+                  'title': titleController.text.trim(),
+                  'description': descriptionController.text,
+                  'visibility': selectedVisibility,
+                });
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    titleController.dispose();
+    descriptionController.dispose();
+
+    if (result == null) return;
+
+    final currentTitle = currentVideo['title']?.toString() ?? '';
+    final currentDescription = currentVideo['description']?.toString() ?? '';
+    final currentVisibility = currentVideo['visibility']?.toString() ?? 'private';
+
+    final newTitle = result['title']?.toString() ?? '';
+    final newDescription = result['description']?.toString() ?? '';
+    final newVisibility = result['visibility']?.toString() ?? currentVisibility;
+
+    final payload = <String, dynamic>{};
+
+    if (newTitle != currentTitle) {
+      payload['title'] = newTitle;
+    }
+
+    if (newDescription != currentDescription) {
+      payload['description'] = newDescription;
+    }
+
+    if (newVisibility != currentVisibility) {
+      payload['visibility'] = newVisibility;
+    }
+
+    if (payload.isEmpty) return;
+
+    setState(() {
+      actionLoading = true;
+      error = null;
+    });
+
+    try {
+      final updated = await videoRepository.updateVideo(
+        widget.videoId,
+        title: payload['title'] as String?,
+        description: payload['description'] as String?,
+        visibility: payload['visibility'] as String?,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        video = updated;
+        actionLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Video updated')),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        error =
+            e.response?.data?.toString() ?? e.message ?? 'Failed to update video';
+        actionLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        error = 'Failed to update video: $e';
+        actionLoading = false;
+      });
+    }
+  }
+
+  Future<void> deleteVideo() async {
+    if (actionLoading) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete video'),
+          content: const Text('Are you sure you want to delete this video?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      actionLoading = true;
+      error = null;
+    });
+
+    try {
+      await videoRepository.deleteVideo(widget.videoId);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Video deleted')),
+      );
+
+      Navigator.of(context).pop(true);
+    } on DioException catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        error =
+            e.response?.data?.toString() ?? e.message ?? 'Failed to delete video';
+        actionLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        error = 'Failed to delete video: $e';
+        actionLoading = false;
+      });
+    }
+  }
+
+  String formatDuration(dynamic value) {
+    if (value == null) return '—';
+    if (value is! num) return value.toString();
+
+    final seconds = value.round();
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final rest = seconds % 60;
+
+    if (hours > 0) {
+      return '$hours:${minutes.toString().padLeft(2, '0')}:${rest.toString().padLeft(2, '0')}';
+    }
+
+    return '$minutes:${rest.toString().padLeft(2, '0')}';
+  }
+
+  String formatDateTime(dynamic value) {
+    final raw = value?.toString();
+    if (raw == null || raw.isEmpty) return '—';
+
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return raw;
+
+    final local = dt.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final year = local.year.toString();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+
+    return '$day.$month.$year $hour:$minute';
+  }
+
+  String formatOwner(Map<String, dynamic> currentVideo) {
+    final owner = currentVideo['owner'];
+    if (owner is Map) {
+      final map = Map<String, dynamic>.from(owner);
+      final username = map['username']?.toString().trim();
+      if (username != null && username.isNotEmpty) {
+        return username;
+      }
+    }
+    return '—';
+  }
+
+  Widget infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text('$label: $value'),
+    );
+  }
+
+  @override
+  void dispose() {
+    pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentVideo = video;
+    final effectiveHlsUrl =
+        playback?['hls_url']?.toString() ?? currentVideo?['hls_url']?.toString();
+    final effectiveHlsReady =
+        playback?['hls_ready'] == true || currentVideo?['hls_ready'] == true;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(currentVideo?['title']?.toString() ?? 'Video #${widget.videoId}'),
+        actions: [
+          IconButton(
+            onPressed: actionLoading ? null : editVideo,
+            icon: const Icon(Icons.edit),
+            tooltip: 'Edit',
+          ),
+          IconButton(
+            onPressed: actionLoading ? null : deleteVideo,
+            icon: const Icon(Icons.delete),
+            tooltip: 'Delete',
+          ),
+          IconButton(
+            onPressed: (_requestInFlight || actionLoading)
+                ? null
+                : () {
+                    setState(() {
+                      loading = true;
+                      error = null;
+                    });
+                    loadVideo();
+                  },
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                )
+              : currentVideo == null
+                  ? const Center(child: Text('Видео не найдено'))
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (effectiveHlsReady && effectiveHlsUrl != null) ...[
+                            HlsPlayer(url: effectiveHlsUrl),
+                            const SizedBox(height: 16),
+                          ] else ...[
+                            const Text('HLS ещё не готов'),
+                            const SizedBox(height: 16),
+                          ],
+                          infoRow('Title', currentVideo['title']?.toString() ?? '—'),
+                          infoRow(
+                            'Description',
+                            currentVideo['description']?.toString().trim().isNotEmpty ==
+                                    true
+                                ? currentVideo['description'].toString()
+                                : '—',
+                          ),
+                          infoRow('Status', currentVideo['status']?.toString() ?? '—'),
+                          infoRow(
+                            'Visibility',
+                            currentVideo['visibility']?.toString() ?? '—',
+                          ),
+                          infoRow(
+                            'Duration',
+                            formatDuration(currentVideo['duration']),
+                          ),
+                          infoRow(
+                            'Owner',
+                            formatOwner(currentVideo),
+                          ),
+                          infoRow(
+                            'Uploaded',
+                            formatDateTime(currentVideo['uploaded_at']),
+                          ),
+                          infoRow(
+                            'Processed',
+                            formatDateTime(currentVideo['processed_at']),
+                          ),
+                          infoRow(
+                            'HLS ready',
+                            (currentVideo['hls_ready'] == true).toString(),
+                          ),
+                          infoRow(
+                            'HLS URL',
+                            currentVideo['hls_url']?.toString() ?? '—',
+                          ),
+                          infoRow(
+                            'Playback HLS URL',
+                            playback?['hls_url']?.toString() ?? '—',
+                          ),
+                          infoRow(
+                            'Error',
+                            currentVideo['error_message']?.toString() ?? '—',
+                          ),
+                        ],
+                      ),
+                    ),
+    );
+  }
+}
