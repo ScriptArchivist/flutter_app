@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'core/network/api_client.dart';
 import 'core/network/token_storage.dart';
 import 'repositories/auth_repository.dart';
+import 'repositories/auth_state_controller.dart';
 import 'repositories/live_repository.dart';
 import 'repositories/upload_repository.dart';
 import 'repositories/video_repository.dart';
@@ -12,6 +13,7 @@ class AppDependencies {
   final TokenStorage tokenStorage;
   final ApiClient apiClient;
   final AuthRepository authRepository;
+  final AuthStateController authStateController;
   final LiveRepository liveRepository;
   final UploadRepository uploadRepository;
   final VideoRepository videoRepository;
@@ -21,6 +23,7 @@ class AppDependencies {
     required this.tokenStorage,
     required this.apiClient,
     required this.authRepository,
+    required this.authStateController,
     required this.liveRepository,
     required this.uploadRepository,
     required this.videoRepository,
@@ -29,7 +32,13 @@ class AppDependencies {
   factory AppDependencies.create() {
     final dio = Dio();
     final tokenStorage = TokenStorage();
-    final apiClient = ApiClient(dio, tokenStorage);
+    final authStateController = AuthStateController(tokenStorage);
+
+    final apiClient = ApiClient(
+      dio,
+      tokenStorage,
+      onUnauthorized: authStateController.handleUnauthorized,
+    );
 
     final authRepository = AuthRepository(dio, tokenStorage);
     final liveRepository = LiveRepository(dio);
@@ -41,6 +50,7 @@ class AppDependencies {
       tokenStorage: tokenStorage,
       apiClient: apiClient,
       authRepository: authRepository,
+      authStateController: authStateController,
       liveRepository: liveRepository,
       uploadRepository: uploadRepository,
       videoRepository: videoRepository,

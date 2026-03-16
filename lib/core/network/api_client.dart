@@ -29,8 +29,13 @@ class NetworkLogBuffer {
 class ApiClient {
   final Dio dio;
   final TokenStorage tokenStorage;
+  final Future<void> Function()? onUnauthorized;
 
-  ApiClient(this.dio, this.tokenStorage) {
+  ApiClient(
+    this.dio,
+    this.tokenStorage, {
+    this.onUnauthorized,
+  }) {
     dio.options = dio.options.copyWith(
       connectTimeout: const Duration(seconds: 15),
       sendTimeout: const Duration(seconds: 30),
@@ -79,7 +84,7 @@ class ApiClient {
 
           handler.next(response);
         },
-        onError: (e, handler) {
+        onError: (e, handler) async {
           NetworkLogBuffer.add(
             'ERROR ${e.requestOptions.method} ${e.requestOptions.uri}',
           );
@@ -95,6 +100,11 @@ class ApiClient {
 
           if (e.error != null) {
             NetworkLogBuffer.add('ERROR INNER ${_truncate(e.error.toString())}');
+          }
+
+          if (e.response?.statusCode == 401 && onUnauthorized != null) {
+            NetworkLogBuffer.add('AUTH UNAUTHORIZED => CLEAR TOKEN');
+            await onUnauthorized!.call();
           }
 
           handler.next(e);

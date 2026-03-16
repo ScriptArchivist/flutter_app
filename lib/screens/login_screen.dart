@@ -5,13 +5,14 @@ import '../config/app_config.dart';
 import '../core/network/api_client.dart';
 import '../core/network/error_parser.dart';
 import '../repositories/auth_repository.dart';
+import '../repositories/auth_state_controller.dart';
 import '../repositories/live_repository.dart';
 import '../repositories/upload_repository.dart';
 import '../repositories/video_repository.dart';
-import 'video_list_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthRepository authRepository;
+  final AuthStateController authStateController;
   final VideoRepository videoRepository;
   final UploadRepository uploadRepository;
   final LiveRepository liveRepository;
@@ -19,6 +20,7 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     required this.authRepository,
+    required this.authStateController,
     required this.videoRepository,
     required this.uploadRepository,
     required this.liveRepository,
@@ -37,6 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? error;
 
   AuthRepository get authRepository => widget.authRepository;
+  AuthStateController get authStateController => widget.authStateController;
 
   @override
   void initState() {
@@ -80,20 +83,14 @@ class _LoginScreenState extends State<LoginScreen> {
     NetworkLogBuffer.add('LOGIN SCREEN URL => ${AppConfig.identityLoginUrl}');
 
     try {
-      await authRepository.login(username, password);
+      final token = await authRepository.login(username, password);
+      await authStateController.setAuthenticated(token);
 
       if (!mounted) return;
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => VideoListScreen(
-            videoRepository: widget.videoRepository,
-            authRepository: widget.authRepository,
-            uploadRepository: widget.uploadRepository,
-            liveRepository: widget.liveRepository,
-          ),
-        ),
-      );
+      setState(() {
+        loading = false;
+      });
     } catch (e) {
       if (!mounted) return;
 

@@ -22,6 +22,14 @@ class NetworkErrorMapper {
   static const String defaultMessage =
       'Не удалось выполнить запрос. Попробуйте снова.';
 
+  static bool isUnauthorized(Object error) {
+    if (error is DioException) {
+      return error.response?.statusCode == 401;
+    }
+
+    return false;
+  }
+
   static String map(
     Object error, {
     String fallbackMessage = defaultMessage,

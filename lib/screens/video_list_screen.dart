@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../core/network/error_parser.dart';
 import '../repositories/auth_repository.dart';
+import '../repositories/auth_state_controller.dart';
 import '../repositories/live_repository.dart';
 import '../repositories/upload_repository.dart';
 import '../repositories/video_repository.dart';
 import 'live_screen.dart';
-import 'login_screen.dart';
 import 'upload_screen.dart';
 import 'video_detail_screen.dart';
 
 class VideoListScreen extends StatefulWidget {
   final VideoRepository videoRepository;
   final AuthRepository authRepository;
+  final AuthStateController authStateController;
   final UploadRepository uploadRepository;
   final LiveRepository liveRepository;
 
@@ -20,6 +21,7 @@ class VideoListScreen extends StatefulWidget {
     super.key,
     required this.videoRepository,
     required this.authRepository,
+    required this.authStateController,
     required this.uploadRepository,
     required this.liveRepository,
   });
@@ -31,6 +33,7 @@ class VideoListScreen extends StatefulWidget {
 class _VideoListScreenState extends State<VideoListScreen> {
   VideoRepository get videoRepository => widget.videoRepository;
   AuthRepository get authRepository => widget.authRepository;
+  AuthStateController get authStateController => widget.authStateController;
   UploadRepository get uploadRepository => widget.uploadRepository;
   LiveRepository get liveRepository => widget.liveRepository;
 
@@ -44,51 +47,46 @@ class _VideoListScreenState extends State<VideoListScreen> {
     loadVideos();
   }
 
-  Future<void> loadVideos() async {
-    if (mounted) {
-      setState(() {
-        loading = true;
-        error = null;
-      });
-    }
-
-    try {
-      final result = await videoRepository.getVideos();
-
-      if (!mounted) return;
-
-      setState(() {
-        videos = result;
-        error = null;
-        loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        error = NetworkErrorMapper.map(
-          e,
-          fallbackMessage: 'Не удалось загрузить список видео.',
-        );
-        loading = false;
-      });
-    }
+Future<void> loadVideos() async {
+  if (mounted) {
+    setState(() {
+      loading = true;
+      error = null;
+    });
   }
 
-  Future<void> logout() async {
-    await authRepository.logout();
+  try {
+    final result = await videoRepository.getVideos();
+
     if (!mounted) return;
 
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => LoginScreen(
-          authRepository: authRepository,
-          videoRepository: videoRepository,
-          uploadRepository: uploadRepository,
-          liveRepository: liveRepository,
-        ),
-      ),
-      (_) => false,
-    );
+    setState(() {
+      videos = result;
+      error = null;
+      loading = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    if (NetworkErrorMapper.isUnauthorized(e)) {
+      setState(() {
+        loading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      error = NetworkErrorMapper.map(
+        e,
+        fallbackMessage: 'Не удалось загрузить список видео.',
+      );
+      loading = false;
+    });
+  }
+}
+
+  Future<void> logout() async {
+    await authStateController.logout();
   }
 
   String formatDuration(dynamic value) {

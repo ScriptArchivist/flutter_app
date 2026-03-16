@@ -12,7 +12,7 @@ class AuthRepository {
 
   AuthRepository(this.dio, this.storage);
 
-  Future<void> login(String username, String password) async {
+  Future<String> login(String username, String password) async {
     if (!AppConfig.hasIdentityBaseUrl) {
       throw const ApiException(
         'IDENTITY_BASE_URL пустой. APK, вероятно, собран без корректного --dart-define.',
@@ -54,14 +54,14 @@ class AuthRepository {
     }
 
     final data = Map<String, dynamic>.from(raw);
-    final token = (data['access_token'] ?? data['token'])?.toString();
+    final token = (data['access_token'] ?? data['token'])?.toString().trim();
 
     if (token == null || token.isEmpty) {
       throw const ApiException(NetworkErrorMapper.invalidResponseMessage);
     }
 
-    await storage.saveToken(token);
-    NetworkLogBuffer.add('AUTH TOKEN SAVED');
+    NetworkLogBuffer.add('AUTH TOKEN RECEIVED');
+    return token;
   }
 
   Future<void> logout() async {
