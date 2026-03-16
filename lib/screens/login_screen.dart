@@ -1,9 +1,9 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../config/app_config.dart';
 import '../core/network/api_client.dart';
+import '../core/network/error_parser.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/live_repository.dart';
 import '../repositories/upload_repository.dart';
@@ -94,38 +94,15 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       );
-    } on DioException catch (e) {
-      if (!mounted) return;
-
-      String message = 'Login failed';
-      final data = e.response?.data;
-
-      if (data is Map) {
-        final map = Map<String, dynamic>.from(data);
-
-        if (map['error'] is Map) {
-          final err = Map<String, dynamic>.from(map['error'] as Map);
-          message = (err['message'] ?? err['code'] ?? message).toString();
-        } else if (map['detail'] != null) {
-          message = map['detail'].toString();
-        } else if (map['message'] != null) {
-          message = map['message'].toString();
-        }
-      } else if (e.response?.statusCode == 401) {
-        message = 'Неверный username или password';
-      } else if (e.message != null && e.message!.isNotEmpty) {
-        message = e.message!;
-      }
-
-      setState(() {
-        error = message;
-        loading = false;
-      });
     } catch (e) {
       if (!mounted) return;
 
       setState(() {
-        error = 'Login failed: $e';
+        error = NetworkErrorMapper.map(
+          e,
+          fallbackMessage: 'Не удалось выполнить вход.',
+          context: NetworkErrorContext.login,
+        );
         loading = false;
       });
     }

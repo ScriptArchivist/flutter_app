@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../core/network/error_parser.dart';
 
 class LiveRepository {
   final Dio dio;
@@ -42,11 +43,11 @@ class LiveRepository {
   }
 
   Map<String, dynamic> _normalizeSessionResponse(dynamic raw) {
-    final map = Map<String, dynamic>.from(raw as Map);
+    final map = _requireMap(raw);
 
     if (map['session'] is Map) {
       return {
-        'session': Map<String, dynamic>.from(map['session'] as Map),
+        'session': _requireMap(map['session']),
         'rtmp_url': _rewriteRtmpUrl(map['rtmp_url']?.toString()),
         'hls_url': _rewriteHlsUrl(map['hls_url']?.toString()),
       };
@@ -57,6 +58,14 @@ class LiveRepository {
       'rtmp_url': _rewriteRtmpUrl(map['rtmp_url']?.toString()),
       'hls_url': _rewriteHlsUrl(map['hls_url']?.toString()),
     };
+  }
+
+  Map<String, dynamic> _requireMap(dynamic raw) {
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+
+    throw const ApiException(NetworkErrorMapper.invalidResponseMessage);
   }
 
   String? _rewriteRtmpUrl(String? rawUrl) {

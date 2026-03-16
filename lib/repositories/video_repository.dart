@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../core/network/error_parser.dart';
 
 class VideoRepository {
   final Dio dio;
@@ -21,10 +22,14 @@ class VideoRepository {
       },
     );
 
-    final data = Map<String, dynamic>.from(res.data as Map);
-    final items = data['items'] as List<dynamic>? ?? const [];
+    final data = _requireMap(res.data);
+    final rawItems = data['items'];
 
-    return items
+    if (rawItems is! List) {
+      throw const ApiException(NetworkErrorMapper.invalidResponseMessage);
+    }
+
+    return rawItems
         .whereType<Map>()
         .map((e) => _normalizeVideoMap(Map<String, dynamic>.from(e)))
         .toList();
@@ -41,7 +46,7 @@ class VideoRepository {
       },
     );
 
-    return _normalizeVideoMap(Map<String, dynamic>.from(res.data as Map));
+    return _normalizeVideoMap(_requireMap(res.data));
   }
 
   Future<Map<String, dynamic>> getPlayback(
@@ -55,7 +60,7 @@ class VideoRepository {
       },
     );
 
-    return _normalizePlaybackMap(Map<String, dynamic>.from(res.data as Map));
+    return _normalizePlaybackMap(_requireMap(res.data));
   }
 
   Future<Map<String, dynamic>> createVideo({
@@ -77,7 +82,7 @@ class VideoRepository {
       data: data,
     );
 
-    return _normalizeVideoMap(Map<String, dynamic>.from(res.data as Map));
+    return _normalizeVideoMap(_requireMap(res.data));
   }
 
   Future<Map<String, dynamic>> updateVideo(
@@ -101,7 +106,7 @@ class VideoRepository {
     }
 
     if (data.isEmpty) {
-      throw Exception('No fields to update');
+      throw const ApiException('Нет данных для обновления.');
     }
 
     final res = await dio.patch(
@@ -109,13 +114,21 @@ class VideoRepository {
       data: data,
     );
 
-    return _normalizeVideoMap(Map<String, dynamic>.from(res.data as Map));
+    return _normalizeVideoMap(_requireMap(res.data));
   }
 
   Future<void> deleteVideo(int id) async {
     await dio.delete(
       '${AppConfig.videoBaseUrl}/videos/$id',
     );
+  }
+
+  Map<String, dynamic> _requireMap(dynamic raw) {
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+
+    throw const ApiException(NetworkErrorMapper.invalidResponseMessage);
   }
 
   Map<String, dynamic> _normalizeVideoMap(Map<String, dynamic> map) {

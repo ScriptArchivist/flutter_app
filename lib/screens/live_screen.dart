@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rtmp_streaming/camera.dart';
 
+import '../core/network/error_parser.dart';
 import '../repositories/live_repository.dart';
 import '../widgets/hls_player.dart';
 
@@ -157,7 +157,9 @@ class _LiveScreenState extends State<LiveScreen> {
 
       final targetRtmpUrl = rtmpUrl;
       if (targetRtmpUrl == null || targetRtmpUrl.isEmpty) {
-        throw Exception('Backend did not return RTMP URL');
+        throw const ApiException(
+          NetworkErrorMapper.invalidResponseMessage,
+        );
       }
 
       await controller.prepareForVideoStreaming();
@@ -175,14 +177,6 @@ class _LiveScreenState extends State<LiveScreen> {
       });
 
       startPolling();
-    } on DioException catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        error = e.response?.data?.toString() ?? e.message ?? 'Live start failed';
-        loading = false;
-        isStreaming = false;
-      });
     } catch (e) {
       final rawId = session?['id'];
       final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
@@ -196,7 +190,10 @@ class _LiveScreenState extends State<LiveScreen> {
       if (!mounted) return;
 
       setState(() {
-        error = 'Live start failed: $e';
+        error = NetworkErrorMapper.map(
+          e,
+          fallbackMessage: 'Не удалось запустить трансляцию.',
+        );
         loading = false;
         isStreaming = false;
         session = null;
@@ -275,16 +272,13 @@ class _LiveScreenState extends State<LiveScreen> {
           };
         }
       });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        error = e.response?.data?.toString() ?? e.message ?? 'Stop live failed';
-        loading = false;
-      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        error = 'Stop live failed: $e';
+        error = NetworkErrorMapper.map(
+          e,
+          fallbackMessage: 'Не удалось остановить трансляцию.',
+        );
         loading = false;
       });
     }

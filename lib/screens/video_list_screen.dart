@@ -1,6 +1,6 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../core/network/error_parser.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/live_repository.dart';
 import '../repositories/upload_repository.dart';
@@ -62,17 +62,13 @@ class _VideoListScreenState extends State<VideoListScreen> {
         error = null;
         loading = false;
       });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        error =
-            e.response?.data?.toString() ?? e.message ?? 'Failed to load videos';
-        loading = false;
-      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        error = 'Failed to load videos: $e';
+        error = NetworkErrorMapper.map(
+          e,
+          fallbackMessage: 'Не удалось загрузить список видео.',
+        );
         loading = false;
       });
     }

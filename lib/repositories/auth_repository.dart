@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
 import '../core/network/api_client.dart';
+import '../core/network/error_parser.dart';
 import '../core/network/token_storage.dart';
 
 class AuthRepository {
@@ -13,8 +14,8 @@ class AuthRepository {
 
   Future<void> login(String username, String password) async {
     if (!AppConfig.hasIdentityBaseUrl) {
-      throw Exception(
-        'IDENTITY_BASE_URL is empty. APK was likely built without correct --dart-define.',
+      throw const ApiException(
+        'IDENTITY_BASE_URL пустой. APK, вероятно, собран без корректного --dart-define.',
       );
     }
 
@@ -49,14 +50,14 @@ class AuthRepository {
 
     final raw = res.data;
     if (raw is! Map) {
-      throw Exception('Login response is not a JSON object');
+      throw const ApiException(NetworkErrorMapper.invalidResponseMessage);
     }
 
     final data = Map<String, dynamic>.from(raw);
     final token = (data['access_token'] ?? data['token'])?.toString();
 
     if (token == null || token.isEmpty) {
-      throw Exception('Token not found in login response');
+      throw const ApiException(NetworkErrorMapper.invalidResponseMessage);
     }
 
     await storage.saveToken(token);
