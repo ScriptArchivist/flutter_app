@@ -5,20 +5,23 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rtmp_streaming/camera.dart';
 
-import '../core/network/api_client.dart';
-import '../core/network/token_storage.dart';
 import '../repositories/live_repository.dart';
 import '../widgets/hls_player.dart';
 
 class LiveScreen extends StatefulWidget {
-  const LiveScreen({super.key});
+  final LiveRepository liveRepository;
+
+  const LiveScreen({
+    super.key,
+    required this.liveRepository,
+  });
 
   @override
   State<LiveScreen> createState() => _LiveScreenState();
 }
 
 class _LiveScreenState extends State<LiveScreen> {
-  late final LiveRepository liveRepository;
+  LiveRepository get liveRepository => widget.liveRepository;
 
   CameraController? cameraController;
   List<CameraDescription> cameras = [];
@@ -42,12 +45,6 @@ class _LiveScreenState extends State<LiveScreen> {
   @override
   void initState() {
     super.initState();
-
-    final dio = Dio();
-    final storage = TokenStorage();
-    ApiClient(dio, storage);
-
-    liveRepository = LiveRepository(dio);
     _initializeEverything();
   }
 

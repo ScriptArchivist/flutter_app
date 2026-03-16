@@ -4,12 +4,25 @@ import 'package:flutter/services.dart';
 
 import '../config/app_config.dart';
 import '../core/network/api_client.dart';
-import '../core/network/token_storage.dart';
 import '../repositories/auth_repository.dart';
+import '../repositories/live_repository.dart';
+import '../repositories/upload_repository.dart';
+import '../repositories/video_repository.dart';
 import 'video_list_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final AuthRepository authRepository;
+  final VideoRepository videoRepository;
+  final UploadRepository uploadRepository;
+  final LiveRepository liveRepository;
+
+  const LoginScreen({
+    super.key,
+    required this.authRepository,
+    required this.videoRepository,
+    required this.uploadRepository,
+    required this.liveRepository,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -23,17 +36,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool showDebugLogs = false;
   String? error;
 
-  late final AuthRepository authRepository;
+  AuthRepository get authRepository => widget.authRepository;
 
   @override
   void initState() {
     super.initState();
-
-    final dio = Dio();
-    final storage = TokenStorage();
-
-    ApiClient(dio, storage);
-    authRepository = AuthRepository(dio, storage);
 
     NetworkLogBuffer.add(
       'APP CONFIG identityBaseUrl => ${AppConfig.identityBaseUrl}',
@@ -79,7 +86,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => VideoListScreen(),
+          builder: (_) => VideoListScreen(
+            videoRepository: widget.videoRepository,
+            authRepository: widget.authRepository,
+            uploadRepository: widget.uploadRepository,
+            liveRepository: widget.liveRepository,
+          ),
         ),
       );
     } on DioException catch (e) {

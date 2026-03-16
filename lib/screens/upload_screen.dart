@@ -1,28 +1,32 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
 import 'package:path/path.dart' as p;
 
-import '../core/network/api_client.dart';
-import '../core/network/token_storage.dart';
 import '../repositories/upload_repository.dart';
 import '../repositories/video_repository.dart';
 import 'video_detail_screen.dart';
 
 class UploadScreen extends StatefulWidget {
-  const UploadScreen({super.key});
+  final VideoRepository videoRepository;
+  final UploadRepository uploadRepository;
+
+  const UploadScreen({
+    super.key,
+    required this.videoRepository,
+    required this.uploadRepository,
+  });
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
 }
 
 class _UploadScreenState extends State<UploadScreen> {
-  late final VideoRepository videoRepository;
-  late final UploadRepository uploadRepository;
+  VideoRepository get videoRepository => widget.videoRepository;
+  UploadRepository get uploadRepository => widget.uploadRepository;
 
   final titleController = TextEditingController();
   final descriptionController = TextEditingController();
@@ -43,18 +47,6 @@ class _UploadScreenState extends State<UploadScreen> {
   int pollingAttempts = 0;
 
   static const int maxPollingAttempts = 120;
-
-  @override
-  void initState() {
-    super.initState();
-
-    final dio = Dio();
-    final storage = TokenStorage();
-    ApiClient(dio, storage);
-
-    videoRepository = VideoRepository(dio);
-    uploadRepository = UploadRepository(dio);
-  }
 
   Future<void> pickVideo() async {
     if (loading) return;
@@ -261,7 +253,10 @@ class _UploadScreenState extends State<UploadScreen> {
         navigationDone = true;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => VideoDetailScreen(videoId: videoId),
+            builder: (_) => VideoDetailScreen(
+              videoId: videoId,
+              videoRepository: videoRepository,
+            ),
           ),
         );
       }

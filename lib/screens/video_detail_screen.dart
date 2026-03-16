@@ -3,22 +3,25 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../core/network/api_client.dart';
-import '../core/network/token_storage.dart';
 import '../repositories/video_repository.dart';
 import '../widgets/hls_player.dart';
 
 class VideoDetailScreen extends StatefulWidget {
   final int videoId;
+  final VideoRepository videoRepository;
 
-  const VideoDetailScreen({super.key, required this.videoId});
+  const VideoDetailScreen({
+    super.key,
+    required this.videoId,
+    required this.videoRepository,
+  });
 
   @override
   State<VideoDetailScreen> createState() => _VideoDetailScreenState();
 }
 
 class _VideoDetailScreenState extends State<VideoDetailScreen> {
-  late final VideoRepository videoRepository;
+  VideoRepository get videoRepository => widget.videoRepository;
 
   bool loading = true;
   bool actionLoading = false;
@@ -31,12 +34,6 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   @override
   void initState() {
     super.initState();
-
-    final dio = Dio();
-    final storage = TokenStorage();
-    ApiClient(dio, storage);
-
-    videoRepository = VideoRepository(dio);
     loadVideo();
   }
 

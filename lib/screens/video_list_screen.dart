@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
-import '../core/network/api_client.dart';
-import '../core/network/token_storage.dart';
 import '../repositories/auth_repository.dart';
+import '../repositories/live_repository.dart';
+import '../repositories/upload_repository.dart';
 import '../repositories/video_repository.dart';
 import 'live_screen.dart';
 import 'login_screen.dart';
@@ -11,17 +11,28 @@ import 'upload_screen.dart';
 import 'video_detail_screen.dart';
 
 class VideoListScreen extends StatefulWidget {
-  const VideoListScreen({super.key});
+  final VideoRepository videoRepository;
+  final AuthRepository authRepository;
+  final UploadRepository uploadRepository;
+  final LiveRepository liveRepository;
+
+  const VideoListScreen({
+    super.key,
+    required this.videoRepository,
+    required this.authRepository,
+    required this.uploadRepository,
+    required this.liveRepository,
+  });
 
   @override
   State<VideoListScreen> createState() => _VideoListScreenState();
 }
 
 class _VideoListScreenState extends State<VideoListScreen> {
-  late final Dio dio;
-  late final TokenStorage storage;
-  late final VideoRepository videoRepository;
-  late final AuthRepository authRepository;
+  VideoRepository get videoRepository => widget.videoRepository;
+  AuthRepository get authRepository => widget.authRepository;
+  UploadRepository get uploadRepository => widget.uploadRepository;
+  LiveRepository get liveRepository => widget.liveRepository;
 
   bool loading = true;
   String? error;
@@ -30,14 +41,6 @@ class _VideoListScreenState extends State<VideoListScreen> {
   @override
   void initState() {
     super.initState();
-
-    dio = Dio();
-    storage = TokenStorage();
-    ApiClient(dio, storage);
-
-    videoRepository = VideoRepository(dio);
-    authRepository = AuthRepository(dio, storage);
-
     loadVideos();
   }
 
@@ -80,7 +83,14 @@ class _VideoListScreenState extends State<VideoListScreen> {
     if (!mounted) return;
 
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(
+          authRepository: authRepository,
+          videoRepository: videoRepository,
+          uploadRepository: uploadRepository,
+          liveRepository: liveRepository,
+        ),
+      ),
       (_) => false,
     );
   }
@@ -120,7 +130,12 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
   Future<void> openUpload() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const UploadScreen()),
+      MaterialPageRoute(
+        builder: (_) => UploadScreen(
+          videoRepository: videoRepository,
+          uploadRepository: uploadRepository,
+        ),
+      ),
     );
 
     if (!mounted) return;
@@ -129,7 +144,11 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
   Future<void> openLive() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LiveScreen()),
+      MaterialPageRoute(
+        builder: (_) => LiveScreen(
+          liveRepository: liveRepository,
+        ),
+      ),
     );
 
     if (!mounted) return;
@@ -138,7 +157,12 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
   Future<void> openDetail(int id) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => VideoDetailScreen(videoId: id)),
+      MaterialPageRoute(
+        builder: (_) => VideoDetailScreen(
+          videoId: id,
+          videoRepository: videoRepository,
+        ),
+      ),
     );
 
     if (!mounted) return;
