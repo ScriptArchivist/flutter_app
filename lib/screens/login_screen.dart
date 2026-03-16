@@ -41,16 +41,20 @@ class _LoginScreenState extends State<LoginScreen> {
   AuthRepository get authRepository => widget.authRepository;
   AuthStateController get authStateController => widget.authStateController;
 
+  bool get _networkLogsEnabled => AppConfig.enableNetworkLogs;
+
   @override
   void initState() {
     super.initState();
 
-    NetworkLogBuffer.add(
-      'APP CONFIG identityBaseUrl => ${AppConfig.identityBaseUrl}',
-    );
-    NetworkLogBuffer.add(
-      'APP CONFIG identityLoginUrl => ${AppConfig.identityLoginUrl}',
-    );
+    if (_networkLogsEnabled) {
+      NetworkLogBuffer.add(
+        'APP CONFIG identityBaseUrl => ${AppConfig.identityBaseUrl}',
+      );
+      NetworkLogBuffer.add(
+        'APP CONFIG identityLoginUrl => ${AppConfig.identityLoginUrl}',
+      );
+    }
   }
 
   Future<void> login() async {
@@ -79,8 +83,10 @@ class _LoginScreenState extends State<LoginScreen> {
       error = null;
     });
 
-    NetworkLogBuffer.add('LOGIN BUTTON PRESSED');
-    NetworkLogBuffer.add('LOGIN SCREEN URL => ${AppConfig.identityLoginUrl}');
+    if (_networkLogsEnabled) {
+      NetworkLogBuffer.add('LOGIN BUTTON PRESSED');
+      NetworkLogBuffer.add('LOGIN SCREEN URL => ${AppConfig.identityLoginUrl}');
+    }
 
     try {
       final token = await authRepository.login(username, password);
@@ -106,6 +112,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void copyLogs() {
+    if (!_networkLogsEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сетевое логирование отключено')),
+      );
+      return;
+    }
+
     final text = [
       'IDENTITY_BASE_URL: ${AppConfig.identityBaseUrl}',
       'LOGIN URL: ${AppConfig.identityLoginUrl}',
@@ -122,6 +135,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void clearLogs() {
+    if (!_networkLogsEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сетевое логирование отключено')),
+      );
+      return;
+    }
+
     setState(() {
       NetworkLogBuffer.clear();
     });
@@ -258,19 +278,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     'Debug logs',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
+                  subtitle: Text(
+                    _networkLogsEnabled
+                        ? 'Сетевое логирование включено'
+                        : 'Сетевое логирование отключено',
+                  ),
                   children: [
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: copyLogs,
+                            onPressed: _networkLogsEnabled ? copyLogs : null,
                             child: const Text('Скопировать логи'),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: clearLogs,
+                            onPressed: _networkLogsEnabled ? clearLogs : null,
                             child: const Text('Очистить логи'),
                           ),
                         ),
@@ -286,7 +311,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: SelectableText(
-                        logs.isEmpty ? 'Пока логов нет' : logs,
+                        _networkLogsEnabled
+                            ? (logs.isEmpty ? 'Пока логов нет' : logs)
+                            : 'Сетевое логирование отключено для этой сборки',
                       ),
                     ),
                   ],

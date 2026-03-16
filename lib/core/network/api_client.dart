@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../config/app_config.dart';
 import 'token_storage.dart';
 
 class NetworkLogBuffer {
@@ -11,7 +12,16 @@ class NetworkLogBuffer {
   static String get text => _lines.join('\n');
 
   static void add(String message) {
-    final line = '[${DateTime.now().toIso8601String()}] $message';
+    if (!AppConfig.enableNetworkLogs) {
+      return;
+    }
+
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+
+    final line = '[${DateTime.now().toIso8601String()}] $trimmed';
     _lines.add(line);
 
     if (_lines.length > 200) {
@@ -58,52 +68,62 @@ class ApiClient {
             }
           }
 
-          NetworkLogBuffer.add('REQUEST ${options.method} ${options.uri}');
-          NetworkLogBuffer.add(
-            'REQUEST HEADERS ${_sanitizeHeaders(options.headers)}',
-          );
-
-          if (options.data != null) {
+          if (AppConfig.enableNetworkLogs) {
+            NetworkLogBuffer.add('REQUEST ${options.method} ${options.uri}');
             NetworkLogBuffer.add(
-              'REQUEST BODY ${_sanitizeBody(options.data)}',
+              'REQUEST HEADERS ${_sanitizeHeaders(options.headers)}',
             );
+
+            if (options.data != null) {
+              NetworkLogBuffer.add(
+                'REQUEST BODY ${_sanitizeBody(options.data)}',
+              );
+            }
           }
 
           handler.next(options);
         },
         onResponse: (response, handler) {
-          NetworkLogBuffer.add(
-            'RESPONSE ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}',
-          );
-
-          if (response.data != null) {
+          if (AppConfig.enableNetworkLogs) {
             NetworkLogBuffer.add(
-              'RESPONSE BODY ${_truncate(_stringify(response.data))}',
+              'RESPONSE ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}',
             );
+
+            if (response.data != null) {
+              NetworkLogBuffer.add(
+                'RESPONSE BODY ${_truncate(_stringify(response.data))}',
+              );
+            }
           }
 
           handler.next(response);
         },
         onError: (e, handler) async {
-          NetworkLogBuffer.add(
-            'ERROR ${e.requestOptions.method} ${e.requestOptions.uri}',
-          );
-          NetworkLogBuffer.add('ERROR TYPE ${e.type}');
-          NetworkLogBuffer.add('ERROR MESSAGE ${e.message}');
-          NetworkLogBuffer.add('ERROR STATUS ${e.response?.statusCode}');
-
-          if (e.response?.data != null) {
+          if (AppConfig.enableNetworkLogs) {
             NetworkLogBuffer.add(
-              'ERROR BODY ${_truncate(_stringify(e.response?.data))}',
+              'ERROR ${e.requestOptions.method} ${e.requestOptions.uri}',
             );
-          }
+            NetworkLogBuffer.add('ERROR TYPE ${e.type}');
+            NetworkLogBuffer.add('ERROR MESSAGE ${e.message}');
+            NetworkLogBuffer.add('ERROR STATUS ${e.response?.statusCode}');
 
-          if (e.error != null) {
-            NetworkLogBuffer.add('ERROR INNER ${_truncate(e.error.toString())}');
+            if (e.response?.data != null) {
+              NetworkLogBuffer.add(
+                'ERROR BODY ${_truncate(_stringify(e.response?.data))}',
+              );
+            }
+
+            if (e.error != null) {
+              NetworkLogBuffer.add(
+                'ERROR INNER ${_truncate(e.error.toString())}',
+              );
+            }
           }
 
           if (e.response?.statusCode == 401 && onUnauthorized != null) {
-            NetworkLogBuffer.add('AUTH UNAUTHORIZED => CLEAR TOKEN');
+            if (AppConfig.enableNetworkLogs) {
+              NetworkLogBuffer.add('AUTH UNAUTHORIZED => CLEAR TOKEN');
+            }
             await onUnauthorized!.call();
           }
 

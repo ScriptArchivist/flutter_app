@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class AppConfig {
   static const _identityBaseUrlRaw = String.fromEnvironment(
     'IDENTITY_BASE_URL',
@@ -24,6 +26,11 @@ class AppConfig {
     defaultValue: 'http://192.168.1.12:8080',
   );
 
+  static const bool _enableNetworkLogsFromDefine = bool.fromEnvironment(
+    'ENABLE_NETWORK_LOGS',
+    defaultValue: false,
+  );
+
   static String get identityBaseUrl => _normalize(_identityBaseUrlRaw);
   static String get videoBaseUrl => _normalize(_videoBaseUrlRaw);
   static String get uploadBaseUrl => _normalize(_uploadBaseUrlRaw);
@@ -33,6 +40,14 @@ class AppConfig {
   static String get identityLoginUrl => '$identityBaseUrl/auth/login';
 
   static bool get hasIdentityBaseUrl => identityBaseUrl.isNotEmpty;
+
+  static bool get enableNetworkLogs {
+    if (kDebugMode) {
+      return true;
+    }
+
+    return _enableNetworkLogsFromDefine;
+  }
 
   static String _normalize(String value) {
     final trimmed = value.trim();
