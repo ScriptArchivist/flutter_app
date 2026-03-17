@@ -157,13 +157,25 @@ class VideoRepository {
     final uri = Uri.tryParse(rawUrl);
     if (uri == null) return rawUrl;
 
-    final host = uri.host.toLowerCase();
-    if (host != 'localhost' && host != '127.0.0.1') {
+    final originBase = Uri.tryParse(AppConfig.originBaseUrl);
+    if (originBase == null || originBase.host.isEmpty) {
       return rawUrl;
     }
 
-    final originBase = Uri.tryParse(AppConfig.originBaseUrl);
-    if (originBase == null || originBase.host.isEmpty) {
+    final hasHost = uri.host.isNotEmpty;
+    final host = uri.host.toLowerCase();
+
+    if (!hasHost) {
+      return Uri(
+        scheme: originBase.scheme.isEmpty ? 'http' : originBase.scheme,
+        host: originBase.host,
+        port: originBase.hasPort ? originBase.port : null,
+        path: uri.path.startsWith('/') ? uri.path : '/${uri.path}',
+        query: uri.hasQuery ? uri.query : null,
+      ).toString();
+    }
+
+    if (host != 'localhost' && host != '127.0.0.1') {
       return rawUrl;
     }
 

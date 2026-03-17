@@ -88,11 +88,14 @@ class _HlsPlayerState extends State<HlsPlayer> {
       await controller.initialize().timeout(const Duration(seconds: 20));
       await controller.setLooping(false);
 
+      controller.addListener(_onControllerChanged);
+
       if (widget.autoplay) {
         await controller.play();
       }
 
       if (!mounted) {
+        controller.removeListener(_onControllerChanged);
         await controller.dispose();
         return;
       }
@@ -110,6 +113,23 @@ class _HlsPlayerState extends State<HlsPlayer> {
         _initializing = false;
       });
     }
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) return;
+
+    final controller = _controller;
+    if (controller == null) return;
+
+    final value = controller.value;
+    if (value.hasError) {
+      setState(() {
+        _error = value.errorDescription ?? 'Playback error';
+      });
+      return;
+    }
+
+    setState(() {});
   }
 
   Widget _buildVideo(VideoPlayerController controller) {
@@ -140,6 +160,21 @@ class _HlsPlayerState extends State<HlsPlayer> {
               : controller.value.aspectRatio,
       child: VideoPlayer(controller),
     );
+  }
+
+  Future<void> _togglePlayPause() async {
+    final controller = _controller;
+    if (controller == null) return;
+
+    if (controller.value.isPlaying) {
+      await controller.pause();
+    } else {
+      await controller.play();
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -190,6 +225,8 @@ class _HlsPlayerState extends State<HlsPlayer> {
                 style: const TextStyle(color: Colors.red),
               ),
               const SizedBox(height: 12),
+              SelectableText(widget.url),
+              const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: _reinitialize,
                 child: const Text('Retry'),
@@ -223,17 +260,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: IconButton(
-                    onPressed: () async {
-                      if (controller.value.isPlaying) {
-                        await controller.pause();
-                      } else {
-                        await controller.play();
-                      }
-
-                      if (mounted) {
-                        setState(() {});
-                      }
-                    },
+                    onPressed: _togglePlayPause,
                     icon: Icon(
                       controller.value.isPlaying
                           ? Icons.pause
@@ -271,17 +298,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
         Row(
           children: [
             IconButton(
-              onPressed: () async {
-                if (controller.value.isPlaying) {
-                  await controller.pause();
-                } else {
-                  await controller.play();
-                }
-
-                if (mounted) {
-                  setState(() {});
-                }
-              },
+              onPressed: _togglePlayPause,
               icon: Icon(
                 controller.value.isPlaying
                     ? Icons.pause
@@ -300,6 +317,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
 
   @override
   void dispose() {
+    _controller?.removeListener(_onControllerChanged);
     _controller?.dispose();
     super.dispose();
   }

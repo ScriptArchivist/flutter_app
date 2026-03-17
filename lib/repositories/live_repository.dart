@@ -3,6 +3,18 @@ import 'package:dio/dio.dart';
 import '../config/app_config.dart';
 import '../core/network/error_parser.dart';
 
+class HlsAvailabilityResult {
+  final bool available;
+  final int? statusCode;
+  final String bodyPreview;
+
+  const HlsAvailabilityResult({
+    required this.available,
+    required this.statusCode,
+    required this.bodyPreview,
+  });
+}
+
 class LiveRepository {
   final Dio dio;
 
@@ -40,6 +52,41 @@ class LiveRepository {
     await dio.delete(
       '${AppConfig.liveBaseUrl}/live/sessions/$sessionId',
     );
+  }
+
+  Future<HlsAvailabilityResult> checkHlsAvailability(String url) async {
+    try {
+      final res = await dio.get(
+        url,
+        options: Options(
+          responseType: ResponseType.plain,
+          extra: const {
+            'skipAuth': true,
+          },
+          headers: const {
+            'Accept':
+                'application/vnd.apple.mpegurl, application/x-mpegURL, text/plain',
+          },
+          validateStatus: (status) =>
+              status != null && status >= 200 && status < 500,
+        ),
+      );
+
+      final body = res.data?.toString() ?? '';
+      final available = res.statusCode == 200 && body.contains('#EXTM3U');
+
+      return HlsAvailabilityResult(
+        available: available,
+        statusCode: res.statusCode,
+        bodyPreview: _truncate(body),
+      );
+    } catch (e) {
+      return HlsAvailabilityResult(
+        available: false,
+        statusCode: null,
+        bodyPreview: e.toString(),
+      );
+    }
   }
 
   Map<String, dynamic> _normalizeSessionResponse(dynamic raw) {
@@ -140,5 +187,13 @@ class LiveRepository {
       path: uri.path,
       query: uri.hasQuery ? uri.query : null,
     ).toString();
+  }
+
+  String _truncate(String value, {int max = 300}) {
+    if (value.length <= max) {
+      return value;
+    }
+
+    return '${value.substring(0, max)}... <truncated>';
   }
 }
