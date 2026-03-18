@@ -12,16 +12,15 @@ import '../widgets/hls_player.dart';
 
 enum LiveViewState {
   idle,
-  initializing,
-  ready,
+  preparingCamera,
   creatingSession,
-  sessionCreated,
-  publishing,
+  connectingRtmp,
+  streaming,
   waitingForHls,
   live,
   stopping,
   stopped,
-  error,
+  failed,
 }
 
 class LiveScreen extends StatefulWidget {
@@ -103,6 +102,33 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  void _setViewState(
+    LiveViewState newState, {
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    if (!mounted) return;
+
+    final shouldUpdate =
+        _viewState != newState ||
+        errorMessage != null ||
+        clearError;
+
+    if (!shouldUpdate) return;
+
+    _logLiveStep('STATE => $_viewState -> $newState');
+
+    setState(() {
+      _viewState = newState;
+      if (clearError) {
+        error = null;
+      }
+      if (errorMessage != null) {
+        error = errorMessage;
+      }
+    });
+  }
+
   Future<void> _disposeCameraOnly() async {
     final controller = cameraController;
     cameraController = null;
@@ -127,11 +153,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeEverything() async {
-    if (mounted) {
-      setState(() {
-        _viewState = LiveViewState.initializing;
-      });
-    }
+    _setViewState(LiveViewState.preparingCamera, clearError: true);
 
     try {
       final granted = await _ensurePermissions();
@@ -139,9 +161,11 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         if (!mounted) return;
         setState(() {
           permissionsGranted = false;
-          error = 'Нужны разрешения на камеру и микрофон';
-          _viewState = LiveViewState.error;
         });
+        _setViewState(
+          LiveViewState.failed,
+          errorMessage: 'Нужны разрешения на камеру и микрофон',
+        );
         return;
       }
 
@@ -152,9 +176,11 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       if (available.isEmpty) {
         setState(() {
           permissionsGranted = true;
-          error = 'Камера не найдена';
-          _viewState = LiveViewState.error;
         });
+        _setViewState(
+          LiveViewState.failed,
+          errorMessage: 'Камера не найдена',
+        );
         return;
       }
 
@@ -179,14 +205,14 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         cameraController = controller;
         cameraInitialized = controller.value.isInitialized == true;
         error = null;
-        _viewState = LiveViewState.ready;
+        _viewState = LiveViewState.idle;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        error = 'Не удалось инициализировать live: $e';
-        _viewState = LiveViewState.error;
-      });
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Не удалось инициализировать live: $e',
+      );
     }
   }
 
@@ -231,7 +257,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       _viewState = LiveViewState.stopped;
       isStreaming = false;
     } else if (status == 'expired' || status == 'error') {
-      _viewState = LiveViewState.error;
+      _viewState = LiveViewState.failed;
       isStreaming = false;
     }
   }
@@ -419,7 +445,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
             if (updatedStatus == 'stopped') {
               _viewState = LiveViewState.stopped;
             } else {
-              _viewState = LiveViewState.error;
+              _viewState = LiveViewState.failed;
             }
           });
         }
@@ -446,10 +472,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
         if (!mounted) return;
 
-        setState(() {
-          error ??= 'Не удалось обновить статус live-сессии.';
-          _viewState = LiveViewState.error;
-        });
+        _setViewState(
+          LiveViewState.failed,
+          errorMessage: error ?? 'Не удалось обновить статус live-сессии.',
+        );
         return;
       }
     } finally {
@@ -701,10 +727,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
     final controller = cameraController;
     if (controller == null || !cameraInitialized) {
-      setState(() {
-        error = 'Камера ещё не инициализирована';
-        _viewState = LiveViewState.error;
-      });
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Камера ещё не инициализирована',
+      );
       return;
     }
 
@@ -732,7 +758,6 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
       setState(() {
         _applySessionResponse(res);
-        _viewState = LiveViewState.sessionCreated;
       });
 
       final rawId = session?['id'];
@@ -751,7 +776,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
       if (mounted) {
         setState(() {
-          _viewState = LiveViewState.publishing;
+          _viewState = LiveViewState.connectingRtmp;
         });
       }
 
@@ -780,7 +805,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       if (createdSessionId != null) {
         try {
           _logLiveStep('START LIVE CLEANUP => stop session id=$createdSessionId');
-          await liveRepository.stopSession(createdSessionId!);
+          await liveRepository.stopSession(createdSessionId);
         } catch (cleanupError) {
           _logLiveStep('START LIVE CLEANUP ERROR => $cleanupError');
         }
@@ -795,7 +820,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         session = null;
         rtmpUrl = null;
         hlsUrl = null;
-        _viewState = LiveViewState.error;
+        _viewState = LiveViewState.failed;
       });
     }
   }
@@ -805,10 +830,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
 
     if (id == null) {
-      setState(() {
-        error = 'Invalid session id';
-        _viewState = LiveViewState.error;
-      });
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Invalid session id',
+      );
       return;
     }
 
@@ -864,7 +889,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
           fallbackMessage: 'Не удалось остановить трансляцию.',
         );
         loading = false;
-        _viewState = LiveViewState.error;
+        _viewState = LiveViewState.failed;
       });
     }
   }
@@ -886,10 +911,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        error = 'Не удалось переключить камеру: $e';
-        _viewState = LiveViewState.error;
-      });
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Не удалось переключить камеру: $e',
+      );
     }
   }
 
@@ -911,10 +936,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        error = 'Не удалось переключить микрофон: $e';
-        _viewState = LiveViewState.error;
-      });
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Не удалось переключить микрофон: $e',
+      );
     }
   }
 
@@ -936,10 +961,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        error = 'Не удалось переключить вспышку: $e';
-        _viewState = LiveViewState.error;
-      });
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Не удалось переключить вспышку: $e',
+      );
     }
   }
 
@@ -968,35 +993,26 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   }
 
   String _stateTitle() {
-    final status = session?['status']?.toString();
-
     switch (_viewState) {
-      case LiveViewState.initializing:
-        return 'Инициализация live';
-      case LiveViewState.ready:
       case LiveViewState.idle:
         return 'Готово к запуску';
+      case LiveViewState.preparingCamera:
+        return 'Подготовка камеры';
       case LiveViewState.creatingSession:
         return 'Создание live session';
-      case LiveViewState.sessionCreated:
-        return 'Сессия создана';
-      case LiveViewState.publishing:
-        return 'Запуск RTMP publishing';
+      case LiveViewState.connectingRtmp:
+        return 'Подключение к RTMP';
+      case LiveViewState.streaming:
+        return 'Поток запущен';
       case LiveViewState.waitingForHls:
-        return 'Поток запущен, ожидаем HLS playlist';
+        return 'Ожидание HLS потока';
       case LiveViewState.live:
         return 'Эфир идёт';
       case LiveViewState.stopping:
         return 'Остановка трансляции';
       case LiveViewState.stopped:
         return 'Трансляция остановлена';
-      case LiveViewState.error:
-        if (status == 'expired') {
-          return 'Сессия истекла';
-        }
-        if (status == 'error') {
-          return 'Ошибка live-сессии';
-        }
+      case LiveViewState.failed:
         return 'Ошибка live';
     }
   }
@@ -1006,17 +1022,16 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       case LiveViewState.live:
         return Colors.red;
       case LiveViewState.waitingForHls:
-      case LiveViewState.publishing:
+      case LiveViewState.streaming:
+      case LiveViewState.connectingRtmp:
       case LiveViewState.creatingSession:
-      case LiveViewState.sessionCreated:
+      case LiveViewState.preparingCamera:
       case LiveViewState.stopping:
-      case LiveViewState.ready:
-      case LiveViewState.initializing:
       case LiveViewState.idle:
         return Colors.blue;
       case LiveViewState.stopped:
         return Colors.grey;
-      case LiveViewState.error:
+      case LiveViewState.failed:
         return Colors.red;
     }
   }
@@ -1136,7 +1151,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
                   style: const TextStyle(color: Colors.red),
                 ),
               ),
-            if (hasSession || _viewState != LiveViewState.ready) ...[
+            if (hasSession || _viewState != LiveViewState.idle) ...[
               Text(
                 _stateTitle(),
                 style: TextStyle(
