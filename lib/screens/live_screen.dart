@@ -69,6 +69,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   bool _pollingInProgress = false;
   bool _pollingActive = false;
   int _pollingFailureCount = 0;
+  int _pollingGeneration = 0;
 
   Timer? _statsTimer;
   bool _statsActive = false;
@@ -287,17 +288,25 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
   void _stopPolling() {
     _pollingActive = false;
+    _pollingGeneration += 1;
+    _pollingFailureCount = 0;
     _cancelPollingTimer();
+    _logLiveStep('SESSION POLLING STOPPED');
   }
 
-  void _scheduleNextPollingTick() {
+  void _scheduleNextPollingTick(int generation) {
     if (!_pollingActive || !mounted) return;
+    if (generation != _pollingGeneration) return;
 
     _cancelPollingTimer();
 
     final delay = _currentPollingDelay();
+    _logLiveStep(
+      'SESSION POLLING SCHEDULED => delay=${delay.inSeconds}s, retry=$_pollingFailureCount, generation=$generation',
+    );
+
     _pollingTimer = Timer(delay, () {
-      unawaited(_pollSessionStatus());
+      unawaited(_pollSessionStatus(generation: generation));
     });
   }
 
@@ -305,18 +314,49 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     final streamKey = session?['stream_key']?.toString();
     final status = session?['status']?.toString();
 
-    if (streamKey == null || streamKey.isEmpty) return;
-    if (_isTerminalSessionStatus(status)) return;
-    if (_pollingActive) return;
+    if (streamKey == null || streamKey.isEmpty) {
+      _logLiveStep('SESSION POLLING NOT STARTED => stream_key is empty');
+      return;
+    }
+    if (_isTerminalSessionStatus(status)) {
+      _logLiveStep(
+        'SESSION POLLING NOT STARTED => terminal status=${status ?? 'null'}',
+      );
+      return;
+    }
+    if (_pollingActive) {
+      _logLiveStep('SESSION POLLING ALREADY ACTIVE => skip');
+      return;
+    }
 
     _pollingActive = true;
     _pollingFailureCount = 0;
-    _scheduleNextPollingTick();
+    _pollingGeneration += 1;
+
+    final generation = _pollingGeneration;
+    _logLiveStep(
+      'SESSION POLLING STARTED => stream_key=$streamKey, generation=$generation',
+    );
+
+    _scheduleNextPollingTick(generation);
   }
 
-  Future<void> _pollSessionStatus({bool manual = false}) async {
-    if (!_pollingActive && !manual) return;
-    if (_pollingInProgress) return;
+  Future<void> _pollSessionStatus({
+    bool manual = false,
+    int? generation,
+  }) async {
+    final activeGeneration = generation ?? _pollingGeneration;
+
+    if (!manual) {
+      if (!_pollingActive) return;
+      if (activeGeneration != _pollingGeneration) return;
+    }
+
+    if (_pollingInProgress) {
+      _logLiveStep('SESSION POLLING SKIPPED => request already in progress');
+      return;
+    }
+
     if (!mounted) return;
 
     final streamKey = session?['stream_key']?.toString();
@@ -337,6 +377,21 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       final updated = await liveRepository.getSession(streamKey);
 
       if (!mounted) return;
+
+      if (!manual) {
+        if (!_pollingActive) {
+          _logLiveStep(
+            'SESSION POLLING RESULT IGNORED => polling already stopped',
+          );
+          return;
+        }
+        if (activeGeneration != _pollingGeneration) {
+          _logLiveStep(
+            'SESSION POLLING RESULT IGNORED => stale generation=$activeGeneration current=$_pollingGeneration',
+          );
+          return;
+        }
+      }
 
       final previousStatus = session?['status']?.toString();
 
@@ -372,6 +427,15 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         return;
       }
     } catch (e) {
+      if (!manual) {
+        if (!_pollingActive || activeGeneration != _pollingGeneration) {
+          _logLiveStep(
+            'SESSION POLLING ERROR IGNORED => stale/disabled generation=$activeGeneration error=$e',
+          );
+          return;
+        }
+      }
+
       _pollingFailureCount += 1;
       _logLiveStep(
         'SESSION POLLING ERROR => retry=$_pollingFailureCount error=$e',
@@ -393,7 +457,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     }
 
     if (!manual) {
-      _scheduleNextPollingTick();
+      _scheduleNextPollingTick(activeGeneration);
     }
   }
 
