@@ -41,6 +41,20 @@ class _VideoListScreenState extends State<VideoListScreen> {
   bool loading = true;
   String? error;
   List<Map<String, dynamic>> videos = [];
+  String searchQuery = '';
+
+  List<Map<String, dynamic>> get filteredVideos {
+    final query = searchQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return videos;
+    }
+
+    return videos.where((video) {
+      final title = video['title']?.toString().toLowerCase() ?? '';
+      final description = video['description']?.toString().toLowerCase() ?? '';
+      return title.contains(query) || description.contains(query);
+    }).toList();
+  }
 
   @override
   void initState() {
@@ -219,8 +233,33 @@ class _VideoListScreenState extends State<VideoListScreen> {
     );
   }
 
+  Widget _buildSearchEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('По вашему запросу ничего не найдено'),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () {
+                setState(() {
+                  searchQuery = '';
+                });
+              },
+              child: const Text('Сбросить поиск'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = filteredVideos;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Videos'),
@@ -258,55 +297,101 @@ class _VideoListScreenState extends State<VideoListScreen> {
               ? _buildErrorState()
               : videos.isEmpty
                   ? _buildEmptyState()
-                  : RefreshIndicator(
-                      onRefresh: loadVideos,
-                      child: ListView.separated(
-                        itemCount: videos.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final video = videos[index];
-                          final id = video['id'];
-                          final description =
-                              video['description']?.toString().trim() ?? '';
-                          final uploadedAt =
-                              formatDateTime(video['uploaded_at']);
-                          final duration = formatDuration(video['duration']);
-
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
+                  : Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Поиск по видео',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: searchQuery.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          searchQuery = '';
+                                        });
+                                      },
+                                      icon: const Icon(Icons.clear),
+                                      tooltip: 'Очистить',
+                                    ),
+                              border: const OutlineInputBorder(),
                             ),
-                            title: Text(
-                              video['title']?.toString().trim().isNotEmpty ==
-                                      true
-                                  ? video['title'].toString()
-                                  : 'Без названия',
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (description.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Text(description),
-                                ],
-                                const SizedBox(height: 8),
-                                Text('Добавлено: $uploadedAt'),
-                                Text('Длительность: $duration'),
-                              ],
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {
-                              final parsedId = id is int
-                                  ? id
-                                  : int.tryParse(id?.toString() ?? '');
-                              if (parsedId != null) {
-                                openDetail(parsedId);
-                              }
+                            onChanged: (value) {
+                              setState(() {
+                                searchQuery = value;
+                              });
                             },
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+                        Expanded(
+                          child: filtered.isEmpty
+                              ? _buildSearchEmptyState()
+                              : RefreshIndicator(
+                                  onRefresh: loadVideos,
+                                  child: ListView.separated(
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, __) =>
+                                        const Divider(height: 1),
+                                    itemBuilder: (context, index) {
+                                      final video = filtered[index];
+                                      final id = video['id'];
+                                      final description = video['description']
+                                              ?.toString()
+                                              .trim() ??
+                                          '';
+                                      final uploadedAt =
+                                          formatDateTime(video['uploaded_at']);
+                                      final duration =
+                                          formatDuration(video['duration']);
+
+                                      return ListTile(
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 8,
+                                        ),
+                                        title: Text(
+                                          video['title']
+                                                      ?.toString()
+                                                      .trim()
+                                                      .isNotEmpty ==
+                                                  true
+                                              ? video['title'].toString()
+                                              : 'Без названия',
+                                        ),
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (description.isNotEmpty) ...[
+                                              const SizedBox(height: 6),
+                                              Text(description),
+                                            ],
+                                            const SizedBox(height: 8),
+                                            Text('Добавлено: $uploadedAt'),
+                                            Text('Длительность: $duration'),
+                                          ],
+                                        ),
+                                        trailing:
+                                            const Icon(Icons.chevron_right),
+                                        onTap: () {
+                                          final parsedId = id is int
+                                              ? id
+                                              : int.tryParse(
+                                                  id?.toString() ?? '',
+                                                );
+                                          if (parsedId != null) {
+                                            openDetail(parsedId);
+                                          }
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                        ),
+                      ],
                     ),
     );
   }
