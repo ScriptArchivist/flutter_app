@@ -47,43 +47,43 @@ class _VideoListScreenState extends State<VideoListScreen> {
     loadVideos();
   }
 
-Future<void> loadVideos() async {
-  if (mounted) {
-    setState(() {
-      loading = true;
-      error = null;
-    });
-  }
-
-  try {
-    final result = await videoRepository.getVideos();
-
-    if (!mounted) return;
-
-    setState(() {
-      videos = result;
-      error = null;
-      loading = false;
-    });
-  } catch (e) {
-    if (!mounted) return;
-
-    if (NetworkErrorMapper.isUnauthorized(e)) {
+  Future<void> loadVideos() async {
+    if (mounted) {
       setState(() {
-        loading = false;
+        loading = true;
+        error = null;
       });
-      return;
     }
 
-    setState(() {
-      error = NetworkErrorMapper.map(
-        e,
-        fallbackMessage: 'Не удалось загрузить список видео.',
-      );
-      loading = false;
-    });
+    try {
+      final result = await videoRepository.getVideos();
+
+      if (!mounted) return;
+
+      setState(() {
+        videos = result;
+        error = null;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      if (NetworkErrorMapper.isUnauthorized(e)) {
+        setState(() {
+          loading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        error = NetworkErrorMapper.map(
+          e,
+          fallbackMessage: 'Не удалось загрузить список видео.',
+        );
+        loading = false;
+      });
+    }
   }
-}
 
   Future<void> logout() async {
     await authStateController.logout();
@@ -249,7 +249,8 @@ Future<void> loadVideos() async {
                           final id = video['id'];
                           final description =
                               video['description']?.toString().trim() ?? '';
-                          final uploadedAt = formatDateTime(video['uploaded_at']);
+                          final uploadedAt =
+                              formatDateTime(video['uploaded_at']);
                           final duration = formatDuration(video['duration']);
 
                           return ListTile(
@@ -258,7 +259,8 @@ Future<void> loadVideos() async {
                               vertical: 8,
                             ),
                             title: Text(
-                              video['title']?.toString().trim().isNotEmpty == true
+                              video['title']?.toString().trim().isNotEmpty ==
+                                      true
                                   ? video['title'].toString()
                                   : 'Без названия',
                             ),

@@ -1,6 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+
+enum HlsPlayerState {
+  initializing,
+  streamNotReady,
+  playing,
+  error,
+}
 
 class HlsPlayer extends StatefulWidget {
   final String url;
@@ -19,15 +28,24 @@ class HlsPlayer extends StatefulWidget {
 }
 
 class _HlsPlayerState extends State<HlsPlayer> {
+  static const int _maxInitAttempts = 5;
+  static const Duration _retryDelay = Duration(seconds: 2);
+  static const Duration _initializeTimeout = Duration(seconds: 20);
+
   VideoPlayerController? _controller;
+
+  HlsPlayerState _state = HlsPlayerState.initializing;
   String? _error;
   bool _unsupportedPlatform = false;
-  bool _initializing = true;
+
+  int _initAttempt = 0;
+  int _initGeneration = 0;
+  Timer? _retryTimer;
 
   @override
   void initState() {
     super.initState();
-    _init();
+    _startInitialization();
   }
 
   @override
@@ -54,7 +72,20 @@ class _HlsPlayerState extends State<HlsPlayer> {
     }
   }
 
+  void _setPlayerState(HlsPlayerState newState, {String? errorMessage}) {
+    if (!mounted) return;
+
+    setState(() {
+      _state = newState;
+      _error = errorMessage;
+    });
+  }
+
   Future<void> _reinitialize() async {
+    _retryTimer?.cancel();
+    _initGeneration += 1;
+    _initAttempt = 0;
+
     final oldController = _controller;
     _controller = null;
 
@@ -62,57 +93,165 @@ class _HlsPlayerState extends State<HlsPlayer> {
       setState(() {
         _error = null;
         _unsupportedPlatform = false;
-        _initializing = true;
+        _state = HlsPlayerState.initializing;
       });
     }
 
-    await oldController?.dispose();
-    await _init();
+    if (oldController != null) {
+      oldController.removeListener(_onControllerChanged);
+      await oldController.dispose();
+    }
+
+    _startInitialization();
   }
 
-  Future<void> _init() async {
+  void _startInitialization() {
+    final generation = ++_initGeneration;
+    _initAttempt = 0;
+    _retryTimer?.cancel();
+    unawaited(_initWithRetry(generation));
+  }
+
+  Future<void> _initWithRetry(int generation) async {
     if (_shouldUseFallback) {
-      if (!mounted) return;
+      if (!mounted || generation != _initGeneration) return;
       setState(() {
         _unsupportedPlatform = true;
-        _initializing = false;
+        _state = HlsPlayerState.error;
+        _error = null;
       });
       return;
     }
 
+    while (mounted &&
+        generation == _initGeneration &&
+        _initAttempt < _maxInitAttempts) {
+      _initAttempt += 1;
+
+      _setPlayerState(HlsPlayerState.initializing);
+
+      final result = await _tryInitializeOnce(generation);
+      if (!mounted || generation != _initGeneration) return;
+
+      if (result == _InitAttemptResult.success) {
+        return;
+      }
+
+      if (result == _InitAttemptResult.streamNotReady) {
+        if (_initAttempt >= _maxInitAttempts) {
+          _setPlayerState(
+            HlsPlayerState.streamNotReady,
+            errorMessage: 'Live stream ещё подготавливается.',
+          );
+          return;
+        }
+
+        _setPlayerState(
+          HlsPlayerState.streamNotReady,
+          errorMessage:
+              'Live stream ещё не готов. Повторная попытка ${_initAttempt + 1}/$_maxInitAttempts...',
+        );
+
+        final completer = Completer<void>();
+        _retryTimer?.cancel();
+        _retryTimer = Timer(_retryDelay, () {
+          if (!completer.isCompleted) {
+            completer.complete();
+          }
+        });
+        await completer.future;
+        continue;
+      }
+
+      if (_initAttempt >= _maxInitAttempts) {
+        _setPlayerState(
+          HlsPlayerState.error,
+          errorMessage: _error ?? 'Не удалось инициализировать HLS player.',
+        );
+        return;
+      }
+
+      final completer = Completer<void>();
+      _retryTimer?.cancel();
+      _retryTimer = Timer(_retryDelay, () {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      });
+      await completer.future;
+    }
+  }
+
+  Future<_InitAttemptResult> _tryInitializeOnce(int generation) async {
+    VideoPlayerController? controller;
+
     try {
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(widget.url),
-      );
+      controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
 
-      await controller.initialize().timeout(const Duration(seconds: 20));
+      await controller.initialize().timeout(_initializeTimeout);
+
+      if (!mounted || generation != _initGeneration) {
+        await controller.dispose();
+        return _InitAttemptResult.cancelled;
+      }
+
       await controller.setLooping(false);
-
       controller.addListener(_onControllerChanged);
 
       if (widget.autoplay) {
         await controller.play();
       }
 
-      if (!mounted) {
-        controller.removeListener(_onControllerChanged);
-        await controller.dispose();
-        return;
+      final previousController = _controller;
+      _controller = controller;
+
+      if (previousController != null && previousController != controller) {
+        previousController.removeListener(_onControllerChanged);
+        await previousController.dispose();
       }
 
-      setState(() {
-        _controller = controller;
-        _error = null;
-        _unsupportedPlatform = false;
-        _initializing = false;
-      });
+      _setPlayerState(HlsPlayerState.playing);
+      return _InitAttemptResult.success;
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Player init failed: $e';
-        _initializing = false;
-      });
+      final message = e.toString();
+      final notReady = _looksLikeStreamNotReady(message);
+
+      if (controller != null) {
+        try {
+          controller.removeListener(_onControllerChanged);
+        } catch (_) {}
+        try {
+          await controller.dispose();
+        } catch (_) {}
+      }
+
+      if (!mounted || generation != _initGeneration) {
+        return _InitAttemptResult.cancelled;
+      }
+
+      if (notReady) {
+        _error = 'HLS playlist пока недоступен';
+        return _InitAttemptResult.streamNotReady;
+      }
+
+      _error = 'Player init failed: $message';
+      return _InitAttemptResult.error;
     }
+  }
+
+  bool _looksLikeStreamNotReady(String message) {
+    final lower = message.toLowerCase();
+
+    return lower.contains('404') ||
+        lower.contains('403') ||
+        lower.contains('source error') ||
+        lower.contains('playlist') ||
+        lower.contains('manifest') ||
+        lower.contains('not found') ||
+        lower.contains('connection closed before full header was received') ||
+        lower.contains('failed to load') ||
+        lower.contains('unrecognized input format') ||
+        lower.contains('behind live window');
   }
 
   void _onControllerChanged() {
@@ -122,14 +261,31 @@ class _HlsPlayerState extends State<HlsPlayer> {
     if (controller == null) return;
 
     final value = controller.value;
+
     if (value.hasError) {
-      setState(() {
-        _error = value.errorDescription ?? 'Playback error';
-      });
+      final description = value.errorDescription ?? 'Playback error';
+
+      if (_looksLikeStreamNotReady(description)) {
+        _setPlayerState(
+          HlsPlayerState.streamNotReady,
+          errorMessage: 'Live stream ещё подготавливается.',
+        );
+      } else {
+        _setPlayerState(
+          HlsPlayerState.error,
+          errorMessage: description,
+        );
+      }
       return;
     }
 
-    setState(() {});
+    if (value.isInitialized) {
+      if (_state != HlsPlayerState.playing) {
+        _setPlayerState(HlsPlayerState.playing);
+      } else {
+        setState(() {});
+      }
+    }
   }
 
   Widget _buildVideo(VideoPlayerController controller) {
@@ -177,6 +333,41 @@ class _HlsPlayerState extends State<HlsPlayer> {
     }
   }
 
+  Widget _buildStatusCard({
+    required String title,
+    required String message,
+    bool showRetry = true,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(message),
+            const SizedBox(height: 12),
+            SelectableText(widget.url),
+            if (showRetry) ...[
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _reinitialize,
+                child: const Text('Retry'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_unsupportedPlatform) {
@@ -209,37 +400,39 @@ class _HlsPlayerState extends State<HlsPlayer> {
       );
     }
 
-    if (_initializing) {
-      return const Center(child: CircularProgressIndicator());
+    if (_state == HlsPlayerState.initializing) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
-    if (_error != null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _error!,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 12),
-              SelectableText(widget.url),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: _reinitialize,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
+    if (_state == HlsPlayerState.streamNotReady) {
+      return _buildStatusCard(
+        title: 'Ожидание live stream',
+        message: _error ?? 'HLS playlist ещё не готов.',
+        showRetry: true,
+      );
+    }
+
+    if (_state == HlsPlayerState.error) {
+      return _buildStatusCard(
+        title: 'Ошибка воспроизведения',
+        message: _error ?? 'Не удалось воспроизвести HLS stream.',
+        showRetry: true,
       );
     }
 
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
     if (widget.immersive) {
@@ -317,8 +510,23 @@ class _HlsPlayerState extends State<HlsPlayer> {
 
   @override
   void dispose() {
-    _controller?.removeListener(_onControllerChanged);
-    _controller?.dispose();
+    _retryTimer?.cancel();
+    _initGeneration += 1;
+
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) {
+      controller.removeListener(_onControllerChanged);
+      controller.dispose();
+    }
+
     super.dispose();
   }
+}
+
+enum _InitAttemptResult {
+  success,
+  streamNotReady,
+  error,
+  cancelled,
 }
