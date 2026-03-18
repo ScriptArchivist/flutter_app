@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
 import '../core/network/error_parser.dart';
+import '../models/video_models.dart';
 
 class HlsAvailabilityResult {
   final bool available;
@@ -46,6 +47,19 @@ class LiveRepository {
     );
 
     return _normalizeSessionResponse(res.data);
+  }
+
+  Future<List<ActiveLiveListItem>> getActiveStreams() async {
+    final res = await dio.get(
+      '${AppConfig.liveBaseUrl}/live/sessions/active',
+    );
+
+    final items = _extractActiveStreamItems(res.data);
+
+    return items
+        .map((item) => _normalizeActiveStreamItem(item))
+        .where((item) => item.streamKey.isNotEmpty)
+        .toList();
   }
 
   Future<void> stopSession(int sessionId) async {
@@ -105,6 +119,41 @@ class LiveRepository {
       'rtmp_url': _rewriteRtmpUrl(map['rtmp_url']?.toString()),
       'hls_url': _rewriteHlsUrl(map['hls_url']?.toString()),
     };
+  }
+
+  List<Map<String, dynamic>> _extractActiveStreamItems(dynamic raw) {
+    if (raw is List) {
+      return raw.whereType<Map>().map(_requireMap).toList();
+    }
+
+    if (raw is Map) {
+      final map = _requireMap(raw);
+
+      const keys = [
+        'items',
+        'streams',
+        'sessions',
+        'results',
+        'data',
+      ];
+
+      for (final key in keys) {
+        final value = map[key];
+        if (value is List) {
+          return value.whereType<Map>().map(_requireMap).toList();
+        }
+      }
+    }
+
+    throw const ApiException(NetworkErrorMapper.invalidResponseMessage);
+  }
+
+  ActiveLiveListItem _normalizeActiveStreamItem(Map<String, dynamic> raw) {
+    final normalized = Map<String, dynamic>.from(raw);
+
+    normalized['hls_url'] = _rewriteHlsUrl(raw['hls_url']?.toString());
+
+    return ActiveLiveListItem.fromJson(normalized);
   }
 
   Map<String, dynamic> _requireMap(dynamic raw) {

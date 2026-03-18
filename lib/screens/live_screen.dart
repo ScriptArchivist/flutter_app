@@ -8,7 +8,6 @@ import 'package:rtmp_streaming/camera.dart';
 import '../config/app_config.dart';
 import '../core/network/error_parser.dart';
 import '../repositories/live_repository.dart';
-import '../widgets/hls_player.dart';
 
 enum LiveViewState {
   idle,
@@ -85,21 +84,60 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   bool _hlsReadyLogged = false;
   int? _lastLoggedHlsStatusCode;
 
+  int _cameraInitGeneration = 0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initializeEverything();
+    _resetScreenStateForEntry();
+    unawaited(_initializeEverything());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cameraInitGeneration += 1;
     _stopPolling();
     _stopStatsMonitoring();
     _stopHlsAvailabilityCheck();
     unawaited(_disposeCameraOnly());
     super.dispose();
+  }
+
+  void _resetScreenStateForEntry() {
+    _stopPolling();
+    _stopStatsMonitoring();
+    _stopHlsAvailabilityCheck();
+
+    session = null;
+    rtmpUrl = null;
+    hlsUrl = null;
+    error = null;
+
+    loading = false;
+    isStreaming = false;
+    permissionsGranted = false;
+    cameraInitialized = false;
+    microphoneEnabled = true;
+    flashEnabled = false;
+
+    cameras = [];
+    currentCameraIndex = 0;
+
+    _viewState = LiveViewState.idle;
+  }
+
+  void _resetSessionRuntimeState() {
+    _stopPolling();
+    _stopStatsMonitoring();
+    _stopHlsAvailabilityCheck();
+
+    session = null;
+    rtmpUrl = null;
+    hlsUrl = null;
+    isStreaming = false;
+    loading = false;
   }
 
   void _setViewState(
@@ -151,14 +189,19 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeEverything() async {
+    final generation = ++_cameraInitGeneration;
     _setViewState(LiveViewState.preparingCamera, clearError: true);
 
     try {
+      await _disposeCameraOnly();
+
       final granted = await _ensurePermissions();
+      if (!mounted || generation != _cameraInitGeneration) return;
+
       if (!granted) {
-        if (!mounted) return;
         setState(() {
           permissionsGranted = false;
+          cameraInitialized = false;
         });
         _setViewState(
           LiveViewState.failed,
@@ -168,12 +211,12 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       }
 
       final available = await availableCameras();
-
-      if (!mounted) return;
+      if (!mounted || generation != _cameraInitGeneration) return;
 
       if (available.isEmpty) {
         setState(() {
           permissionsGranted = true;
+          cameraInitialized = false;
         });
         _setViewState(
           LiveViewState.failed,
@@ -182,8 +225,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         return;
       }
 
-      cameras = available;
-      currentCameraIndex = _preferredCameraIndex(available);
+      final nextCameraIndex = _preferredCameraIndex(available);
 
       final controller = CameraController(
         ResolutionPreset.high,
@@ -191,22 +233,26 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         androidUseOpenGL: true,
       );
 
-      await controller.initialize(available[currentCameraIndex]);
+      await controller.initialize(available[nextCameraIndex]);
 
-      if (!mounted) {
+      if (!mounted || generation != _cameraInitGeneration) {
         await controller.dispose();
         return;
       }
 
       setState(() {
         permissionsGranted = true;
+        cameras = available;
+        currentCameraIndex = nextCameraIndex;
         cameraController = controller;
         cameraInitialized = controller.value.isInitialized == true;
+        microphoneEnabled = true;
+        flashEnabled = false;
         error = null;
         _viewState = LiveViewState.idle;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _cameraInitGeneration) return;
       _setViewState(
         LiveViewState.failed,
         errorMessage: 'Не удалось инициализировать live: $e',
@@ -664,6 +710,9 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     _hlsCheckTimer?.cancel();
     _hlsCheckTimer = null;
     _lastLoggedHlsStatusCode = null;
+    _liveStartedAt = null;
+    _hlsFirstAvailableAt = null;
+    _hlsReadyLogged = false;
   }
 
   Future<void> _checkHlsAvailability() async {
@@ -730,14 +779,15 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       return;
     }
 
-    _stopPolling();
-    _stopStatsMonitoring();
-    _stopHlsAvailabilityCheck();
+    _resetSessionRuntimeState();
 
     if (mounted) {
       setState(() {
         loading = true;
         error = null;
+        session = null;
+        rtmpUrl = null;
+        hlsUrl = null;
         _viewState = LiveViewState.creatingSession;
       });
     }
@@ -894,6 +944,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
     final controller = cameraController;
     if (controller == null || !cameraInitialized) return;
+    if (isStreaming || loading) return;
 
     try {
       final nextIndex = (currentCameraIndex + 1) % cameras.length;
@@ -1047,17 +1098,11 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final status = session?['status']?.toString();
     final hasSession = session != null;
-    final showPlayback = hlsUrl != null &&
-        hlsUrl!.isNotEmpty &&
-        status != 'stopped' &&
-        status != 'expired' &&
-        _viewState != LiveViewState.stopped;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Live'),
+        title: const Text('Live producer'),
         actions: [
           IconButton(
             onPressed: cameras.length > 1 && cameraInitialized && !isStreaming
@@ -1158,6 +1203,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
             ],
             if (session != null) ...[
               _infoRow('Статус', session?['status']?.toString() ?? '—'),
+              _infoRow('Stream key', session?['stream_key']?.toString() ?? '—'),
               _infoRow('Начало', _formatDate(session?['started_at'])),
               _infoRow('Истекает', _formatDate(session?['expires_at'])),
               _infoRow('Остановлено', _formatDate(session?['stopped_at'])),
@@ -1165,15 +1211,6 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
                 _infoRow('RTMP', rtmpUrl!),
               if (hlsUrl != null && hlsUrl!.isNotEmpty)
                 _infoRow('HLS', hlsUrl!),
-            ],
-            const SizedBox(height: 16),
-            if (showPlayback) ...[
-              const Text(
-                'Live playback',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              HlsPlayer(url: hlsUrl!),
             ],
           ],
         ),

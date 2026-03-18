@@ -6,6 +6,7 @@ import '../repositories/auth_state_controller.dart';
 import '../repositories/live_repository.dart';
 import '../repositories/upload_repository.dart';
 import '../repositories/video_repository.dart';
+import 'live_lookup_screen.dart';
 import 'live_screen.dart';
 import 'upload_screen.dart';
 import 'video_detail_screen.dart';
@@ -136,10 +137,23 @@ class _VideoListScreenState extends State<VideoListScreen> {
     await loadVideos();
   }
 
-  Future<void> openLive() async {
+  Future<void> openLiveProducer() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => LiveScreen(
+          liveRepository: liveRepository,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    await loadVideos();
+  }
+
+  Future<void> openLiveViewer() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LiveLookupScreen(
           liveRepository: liveRepository,
         ),
       ),
@@ -217,9 +231,14 @@ class _VideoListScreenState extends State<VideoListScreen> {
             tooltip: 'Upload',
           ),
           IconButton(
-            onPressed: openLive,
+            onPressed: openLiveProducer,
+            icon: const Icon(Icons.videocam),
+            tooltip: 'Live producer',
+          ),
+          IconButton(
+            onPressed: openLiveViewer,
             icon: const Icon(Icons.live_tv),
-            tooltip: 'Live',
+            tooltip: 'Live viewer',
           ),
           IconButton(
             onPressed: loading ? null : loadVideos,
