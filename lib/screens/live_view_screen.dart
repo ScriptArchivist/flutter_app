@@ -127,7 +127,6 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
             const SizedBox(height: 16),
             _infoRow('Title', effectiveTitle),
             _infoRow('Status', _displayValue(status)),
-            _infoRow('Stream key', _displayValue(streamKey)),
             _infoRow('HLS', _displayValue(hlsUrl)),
           ],
         ),

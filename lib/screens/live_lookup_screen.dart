@@ -18,8 +18,6 @@ class LiveLookupScreen extends StatefulWidget {
 }
 
 class _LiveLookupScreenState extends State<LiveLookupScreen> {
-  final TextEditingController streamKeyController = TextEditingController();
-
   bool loading = false;
   String? error;
   List<ActiveLiveListItem> streams = const [];
@@ -60,63 +58,6 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
     }
   }
 
-  Future<void> openLiveByStreamKey() async {
-    final streamKey = streamKeyController.text.trim();
-    if (streamKey.isEmpty || loading) {
-      return;
-    }
-
-    setState(() {
-      loading = true;
-      error = null;
-    });
-
-    try {
-      final result = await widget.liveRepository.getSession(streamKey);
-      final session = result['session'] is Map
-          ? Map<String, dynamic>.from(result['session'] as Map)
-          : <String, dynamic>{};
-
-      final hlsUrl = result['hls_url']?.toString().trim() ?? '';
-      final title = session['title']?.toString().trim().isNotEmpty == true
-          ? session['title'].toString().trim()
-          : 'Live $streamKey';
-      final status = session['status']?.toString();
-
-      if (hlsUrl.isEmpty) {
-        throw const ApiException('HLS URL отсутствует для этой live-сессии.');
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        loading = false;
-      });
-
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => LiveViewScreen(
-            liveRepository: widget.liveRepository,
-            title: title,
-            streamKey: streamKey,
-            hlsUrl: hlsUrl,
-            status: status,
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        error = NetworkErrorMapper.map(
-          e,
-          fallbackMessage: 'Не удалось открыть live.',
-        );
-        loading = false;
-      });
-    }
-  }
-
   Future<void> openLiveItem(ActiveLiveListItem item) async {
     final hlsUrl = item.hlsUrl?.trim() ?? '';
 
@@ -141,9 +82,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
   }
 
   String _formatStartedAt(DateTime? value) {
-    if (value == null) {
-      return '—';
-    }
+    if (value == null) return '—';
 
     final local = value.toLocal();
     final day = local.day.toString().padLeft(2, '0');
@@ -155,41 +94,10 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
     return '$day.$month.$year $hour:$minute';
   }
 
-  Widget _buildManualOpenCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: streamKeyController,
-              decoration: const InputDecoration(
-                labelText: 'Stream key',
-                border: OutlineInputBorder(),
-              ),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => openLiveByStreamKey(),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: loading ? null : openLiveByStreamKey,
-                child: const Text('Open by stream key'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildStateBlock() {
     if (loading && streams.isEmpty) {
       return const Expanded(
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -247,27 +155,22 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
                 leading: const CircleAvatar(
                   child: Icon(Icons.live_tv),
                 ),
-                title: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                title: Text(item.title),
                 subtitle: Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Status: ${item.status}'),
-                      Text('Stream key: ${item.streamKey}'),
                       Text('HLS ready: ${item.hlsReady ? "yes" : "no"}'),
-                      if ((item.ownerName ?? '').trim().isNotEmpty)
-                        Text('Owner: ${item.ownerName!.trim()}'),
+                      if ((item.ownerName ?? '').isNotEmpty)
+                        Text('Owner: ${item.ownerName}'),
                       Text('Started: ${_formatStartedAt(item.startedAt)}'),
-                      if ((item.description ?? '').trim().isNotEmpty)
+                      if ((item.description ?? '').isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            item.description!.trim(),
+                            item.description!,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -286,12 +189,6 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
   }
 
   @override
-  void dispose() {
-    streamKeyController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final hasInlineError = error != null && streams.isNotEmpty;
 
@@ -302,7 +199,6 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
           IconButton(
             onPressed: loading ? null : loadStreams,
             icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
           ),
         ],
       ),
@@ -310,8 +206,6 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildManualOpenCard(),
-            const SizedBox(height: 16),
             if (loading && streams.isNotEmpty) ...[
               const LinearProgressIndicator(),
               const SizedBox(height: 12),
@@ -320,7 +214,6 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
               Text(
                 error!,
                 style: const TextStyle(color: Colors.red),
-                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
             ],
