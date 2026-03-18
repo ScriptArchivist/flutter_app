@@ -21,6 +21,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
   bool loading = false;
   String? error;
   List<ActiveLiveListItem> streams = const [];
+  String searchQuery = '';
 
   @override
   void initState() {
@@ -56,6 +57,26 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
         loading = false;
       });
     }
+  }
+
+  List<ActiveLiveListItem> get filteredStreams {
+    final query = searchQuery.trim().toLowerCase();
+
+    if (query.isEmpty) {
+      return streams;
+    }
+
+    return streams.where((item) {
+      final title = item.title.toLowerCase();
+      final owner = (item.ownerName ?? '').toLowerCase();
+      final streamKey = item.streamKey.toLowerCase();
+      final description = (item.description ?? '').toLowerCase();
+
+      return title.contains(query) ||
+          owner.contains(query) ||
+          streamKey.contains(query) ||
+          description.contains(query);
+    }).toList();
   }
 
   Future<void> openLiveItem(ActiveLiveListItem item) async {
@@ -94,7 +115,63 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
     return '$day.$month.$year $hour:$minute';
   }
 
+  Widget _buildSearch() {
+    return TextField(
+      decoration: InputDecoration(
+        hintText: 'Поиск по live',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: searchQuery.isEmpty
+            ? null
+            : IconButton(
+                onPressed: () {
+                  setState(() {
+                    searchQuery = '';
+                  });
+                },
+                icon: const Icon(Icons.clear),
+              ),
+        border: const OutlineInputBorder(),
+      ),
+      onChanged: (value) {
+        setState(() {
+          searchQuery = value;
+        });
+      },
+    );
+  }
+
+  Widget _buildSearchEmptyState() {
+    return Expanded(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Ничего не найдено',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    searchQuery = '';
+                  });
+                },
+                child: const Text('Сбросить поиск'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStateBlock() {
+    final filtered = filteredStreams;
+    final hasSearch = searchQuery.trim().isNotEmpty;
+
     if (loading && streams.isEmpty) {
       return const Expanded(
         child: Center(child: CircularProgressIndicator()),
@@ -129,25 +206,23 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
     if (streams.isEmpty) {
       return const Expanded(
         child: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Сейчас нет активных live-стримов.',
-              textAlign: TextAlign.center,
-            ),
-          ),
+          child: Text('Сейчас нет live-стримов'),
         ),
       );
+    }
+
+    if (filtered.isEmpty && hasSearch) {
+      return _buildSearchEmptyState();
     }
 
     return Expanded(
       child: RefreshIndicator(
         onRefresh: loadStreams,
         child: ListView.separated(
-          itemCount: streams.length,
+          itemCount: filtered.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
-            final item = streams[index];
+            final item = filtered[index];
 
             return Card(
               child: ListTile(
@@ -156,27 +231,14 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
                   child: Icon(Icons.live_tv),
                 ),
                 title: Text(item.title),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Status: ${item.status}'),
-                      Text('HLS ready: ${item.hlsReady ? "yes" : "no"}'),
-                      if ((item.ownerName ?? '').isNotEmpty)
-                        Text('Owner: ${item.ownerName}'),
-                      Text('Started: ${_formatStartedAt(item.startedAt)}'),
-                      if ((item.description ?? '').isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            item.description!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                  ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Status: ${item.status}'),
+                    if ((item.ownerName ?? '').isNotEmpty)
+                      Text('Owner: ${item.ownerName}'),
+                    Text('Started: ${_formatStartedAt(item.startedAt)}'),
+                  ],
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => openLiveItem(item),
@@ -206,6 +268,8 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            _buildSearch(),
+            const SizedBox(height: 16),
             if (loading && streams.isNotEmpty) ...[
               const LinearProgressIndicator(),
               const SizedBox(height: 12),
@@ -217,14 +281,6 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
               ),
               const SizedBox(height: 12),
             ],
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Активные стримы',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            const SizedBox(height: 12),
             _buildStateBlock(),
           ],
         ),
