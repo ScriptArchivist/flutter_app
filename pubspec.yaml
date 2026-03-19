@@ -19,6 +19,7 @@ dependencies:
   file_picker: ^8.1.2
   permission_handler: ^11.3.1
   rtmp_streaming: 1.0.3
+  wakelock_plus: ^1.2.8
 
 dev_dependencies:
   flutter_test:

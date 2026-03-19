@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rtmp_streaming/camera.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../config/app_config.dart';
 import '../core/network/error_parser.dart';
@@ -87,6 +88,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   int? _lastLoggedHlsStatusCode;
 
   int _cameraInitGeneration = 0;
+  int _cameraPreviewVersion = 0;
+  bool _resumeRecoveryInProgress = false;
 
   @override
   void initState() {
@@ -105,6 +108,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     _stopStatsMonitoring();
     _stopHlsAvailabilityCheck();
     unawaited(_disposeCameraOnly());
+    unawaited(WakelockPlus.disable());
     super.dispose();
   }
 
@@ -129,6 +133,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     currentCameraIndex = 0;
 
     _viewState = LiveViewState.idle;
+    _syncWakeLock();
   }
 
   void _resetSessionRuntimeState() {
@@ -141,6 +146,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     hlsUrl = null;
     isStreaming = false;
     loading = false;
+    _syncWakeLock();
   }
 
   void _setViewState(
@@ -166,6 +172,24 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         error = errorMessage;
       }
     });
+
+    _syncWakeLock();
+  }
+
+  void _syncWakeLock() {
+    final shouldKeepAwake = isStreaming ||
+        loading ||
+        _viewState == LiveViewState.waitingForHls ||
+        _viewState == LiveViewState.connectingRtmp ||
+        _viewState == LiveViewState.creatingSession ||
+        _viewState == LiveViewState.streaming ||
+        _viewState == LiveViewState.live;
+
+    if (shouldKeepAwake) {
+      unawaited(WakelockPlus.enable());
+    } else {
+      unawaited(WakelockPlus.disable());
+    }
   }
 
   Future<void> _disposeCameraOnly() async {
@@ -189,6 +213,41 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _logLiveStep('APP LIFECYCLE => $state');
+
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_handleAppResumed());
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _syncWakeLock();
+    }
+  }
+
+  Future<void> _handleAppResumed() async {
+    if (_resumeRecoveryInProgress) return;
+    _resumeRecoveryInProgress = true;
+
+    try {
+      if (!mounted) return;
+
+      _syncWakeLock();
+
+      if (isStreaming) {
+        if (mounted && cameraController != null) {
+          setState(() {
+            _cameraPreviewVersion += 1;
+          });
+        }
+        return;
+      }
+
+      await _initializeEverything();
+    } finally {
+      _resumeRecoveryInProgress = false;
+    }
   }
 
   Future<void> _initializeEverything() async {
@@ -208,7 +267,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         });
         _setViewState(
           LiveViewState.failed,
-          errorMessage: 'Camera and microphone permissions are required for live streaming.',
+          errorMessage:
+              'Camera and microphone permissions are required for live streaming.',
         );
         return;
       }
@@ -253,7 +313,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         flashEnabled = false;
         error = null;
         _viewState = LiveViewState.idle;
+        _cameraPreviewVersion += 1;
       });
+
+      _syncWakeLock();
     } catch (e) {
       if (!mounted || generation != _cameraInitGeneration) return;
       _setViewState(
@@ -305,6 +368,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       _viewState = LiveViewState.failed;
       isStreaming = false;
     }
+
+    _syncWakeLock();
   }
 
   void _logLiveStep(String message) {
@@ -493,6 +558,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
               _viewState = LiveViewState.failed;
             }
           });
+          _syncWakeLock();
         }
 
         return;
@@ -761,6 +827,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         setState(() {
           _viewState = LiveViewState.live;
         });
+        _syncWakeLock();
       }
 
       _logLiveStep(
@@ -802,6 +869,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         hlsUrl = null;
         _viewState = LiveViewState.creatingSession;
       });
+      _syncWakeLock();
     }
 
     int? createdSessionId;
@@ -835,6 +903,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         setState(() {
           _viewState = LiveViewState.connectingRtmp;
         });
+        _syncWakeLock();
       }
 
       _logLiveStep('START VIDEO STREAMING START');
@@ -853,6 +922,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         _viewState = LiveViewState.waitingForHls;
       });
 
+      _syncWakeLock();
       _startPolling();
       _startStatsMonitoring();
       _startHlsAvailabilityCheck();
@@ -879,6 +949,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         hlsUrl = null;
         _viewState = LiveViewState.failed;
       });
+
+      _syncWakeLock();
     }
   }
 
@@ -903,6 +975,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       error = null;
       _viewState = LiveViewState.stopping;
     });
+    _syncWakeLock();
 
     try {
       final controller = cameraController;
@@ -936,6 +1009,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         rtmpUrl = null;
         _viewState = LiveViewState.stopped;
       });
+
+      _syncWakeLock();
     } catch (e) {
       _logLiveStep('STOP LIVE ERROR => $e');
 
@@ -948,6 +1023,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         loading = false;
         _viewState = LiveViewState.failed;
       });
+
+      _syncWakeLock();
     }
   }
 
@@ -966,6 +1043,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
       setState(() {
         currentCameraIndex = nextIndex;
+        _cameraPreviewVersion += 1;
       });
     } catch (e) {
       if (!mounted) return;
@@ -1190,7 +1268,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
                 aspectRatio: cameraController!.value.aspectRatio,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: CameraPreview(cameraController!),
+                  child: KeyedSubtree(
+                    key: ValueKey(_cameraPreviewVersion),
+                    child: CameraPreview(cameraController!),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
