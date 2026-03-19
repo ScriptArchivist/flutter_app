@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../config/app_config.dart';
 import '../core/network/api_client.dart';
@@ -35,7 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
 
   bool loading = false;
-  bool showDebugLogs = false;
   String? error;
 
   AuthRepository get authRepository => widget.authRepository;
@@ -111,42 +109,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void copyLogs() {
-    if (!_networkLogsEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Сетевое логирование отключено')),
-      );
-      return;
-    }
-
-    final text = [
-      'IDENTITY_BASE_URL: ${AppConfig.identityBaseUrl}',
-      'LOGIN URL: ${AppConfig.identityLoginUrl}',
-      '',
-      'NETWORK LOGS:',
-      NetworkLogBuffer.text,
-    ].join('\n');
-
-    Clipboard.setData(ClipboardData(text: text));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Логи скопированы')),
-    );
-  }
-
-  void clearLogs() {
-    if (!_networkLogsEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Сетевое логирование отключено')),
-      );
-      return;
-    }
-
-    setState(() {
-      NetworkLogBuffer.clear();
-    });
-  }
-
   @override
   void dispose() {
     usernameController.dispose();
@@ -156,169 +118,163 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final logs = NetworkLogBuffer.text;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Prying Eye'),
+        backgroundColor: Colors.black54,
+        elevation: 0,
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF1F2A44),
-                        Color(0xFF243B55),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: const Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 34,
-                        backgroundColor: Colors.white24,
-                        child: Icon(
-                          Icons.videocam_rounded,
-                          size: 34,
-                          color: Colors.white,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Добро пожаловать',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Войдите, чтобы просматривать видео, загружать записи и запускать трансляции.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: usernameController,
-                  enabled: !loading,
-                  autofillHints: const [AutofillHints.username],
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: passwordController,
-                  enabled: !loading,
-                  autofillHints: const [AutofillHints.password],
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => login(),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: loading ? null : login,
-                    child: loading
-                        ? const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 6),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/login_background.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.45),
+          ),
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: SizedBox(
+                        height: constraints.maxHeight,
+                        child: Column(
+                          children: [
+                            const Spacer(flex: 2),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.4),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.18),
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  TextField(
+                                    controller: usernameController,
+                                    enabled: !loading,
+                                    autofillHints: const [
+                                      AutofillHints.username,
+                                    ],
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      labelText: 'Username',
+                                      labelStyle: const TextStyle(
+                                        color: Colors.white70,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacity(0.25),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.08),
+                                    ),
+                                    textInputAction: TextInputAction.next,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextField(
+                                    controller: passwordController,
+                                    enabled: !loading,
+                                    autofillHints: const [
+                                      AutofillHints.password,
+                                    ],
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      labelText: 'Password',
+                                      labelStyle: const TextStyle(
+                                        color: Colors.white70,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide(
+                                          color: Colors.white.withOpacity(0.25),
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: const BorderSide(
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.08),
+                                    ),
+                                    obscureText: true,
+                                    textInputAction: TextInputAction.done,
+                                    onSubmitted: (_) => login(),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: loading ? null : login,
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                      ),
+                                      child: loading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child:
+                                                  CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Text('Login'),
+                                    ),
+                                  ),
+                                  if (error != null) ...[
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      error!,
+                                      style: const TextStyle(
+                                        color: Colors.redAccent,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                          )
-                        : const Text('Login'),
-                  ),
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    error!,
-                    style: const TextStyle(color: Colors.red),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-                const SizedBox(height: 20),
-                ExpansionTile(
-                  initiallyExpanded: showDebugLogs,
-                  onExpansionChanged: (value) {
-                    setState(() {
-                      showDebugLogs = value;
-                    });
-                  },
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Debug logs',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    _networkLogsEnabled
-                        ? 'Сетевое логирование включено'
-                        : 'Сетевое логирование отключено',
-                  ),
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _networkLogsEnabled ? copyLogs : null,
-                            child: const Text('Скопировать логи'),
-                          ),
+                            const Spacer(),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _networkLogsEnabled ? clearLogs : null,
-                            child: const Text('Очистить логи'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      constraints: const BoxConstraints(minHeight: 180),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: SelectableText(
-                        _networkLogsEnabled
-                            ? (logs.isEmpty ? 'Пока логов нет' : logs)
-                            : 'Сетевое логирование отключено для этой сборки',
                       ),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                );
+              },
             ),
           ),
         ),

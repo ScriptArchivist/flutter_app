@@ -116,27 +116,36 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
   }
 
   Widget _buildSearch() {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: 'Поиск по live',
-        prefixIcon: const Icon(Icons.search),
-        suffixIcon: searchQuery.isEmpty
-            ? null
-            : IconButton(
-                onPressed: () {
-                  setState(() {
-                    searchQuery = '';
-                  });
-                },
-                icon: const Icon(Icons.clear),
-              ),
-        border: const OutlineInputBorder(),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
       ),
-      onChanged: (value) {
-        setState(() {
-          searchQuery = value;
-        });
-      },
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: 'Поиск по live',
+          hintStyle: const TextStyle(color: Colors.white54),
+          prefixIcon: const Icon(Icons.search, color: Colors.white70),
+          suffixIcon: searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  onPressed: () {
+                    setState(() {
+                      searchQuery = '';
+                    });
+                  },
+                  icon: const Icon(Icons.clear, color: Colors.white70),
+                ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+        style: const TextStyle(color: Colors.white),
+        onChanged: (value) {
+          setState(() {
+            searchQuery = value;
+          });
+        },
+      ),
     );
   }
 

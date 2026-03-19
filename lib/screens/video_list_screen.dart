@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../config/app_config.dart';
+import '../core/network/api_client.dart';
 import '../core/network/error_parser.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/auth_state_controller.dart';
@@ -39,6 +42,7 @@ class _VideoListScreenState extends State<VideoListScreen> {
   LiveRepository get liveRepository => widget.liveRepository;
 
   bool loading = true;
+  bool showDebugLogs = false;
   String? error;
   List<Map<String, dynamic>> videos = [];
   String searchQuery = '';
@@ -102,6 +106,42 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
   Future<void> logout() async {
     await authStateController.logout();
+  }
+
+  Future<void> copyLogs() async {
+    if (!AppConfig.enableNetworkLogs) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сетевое логирование отключено')),
+      );
+      return;
+    }
+
+    final text = NetworkLogBuffer.text;
+
+    await Clipboard.setData(
+      ClipboardData(
+        text: text.isEmpty ? 'Пока логов нет' : text,
+      ),
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Логи скопированы')),
+    );
+  }
+
+  void clearLogs() {
+    if (!AppConfig.enableNetworkLogs) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сетевое логирование отключено')),
+      );
+      return;
+    }
+
+    setState(() {
+      NetworkLogBuffer.clear();
+    });
   }
 
   String formatDuration(dynamic value) {
@@ -256,6 +296,106 @@ class _VideoListScreenState extends State<VideoListScreen> {
     );
   }
 
+  Widget _buildSearchField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: 'Поиск по видео',
+          hintStyle: const TextStyle(color: Colors.white54),
+          prefixIcon: const Icon(Icons.search, color: Colors.white70),
+          suffixIcon: searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  onPressed: () {
+                    setState(() {
+                      searchQuery = '';
+                    });
+                  },
+                  icon: const Icon(Icons.clear, color: Colors.white70),
+                  tooltip: 'Очистить',
+                ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        ),
+        style: const TextStyle(color: Colors.white),
+        onChanged: (value) {
+          setState(() {
+            searchQuery = value;
+          });
+        },
+      ),
+    );
+  }
+
+  Widget _buildDebugLogs() {
+    final logs = NetworkLogBuffer.text;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ExpansionTile(
+        initiallyExpanded: showDebugLogs,
+        onExpansionChanged: (value) {
+          setState(() {
+            showDebugLogs = value;
+          });
+        },
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: const Text(
+          'Debug logs',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Text(
+          AppConfig.enableNetworkLogs
+              ? 'Сетевое логирование включено'
+              : 'Сетевое логирование отключено',
+        ),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: AppConfig.enableNetworkLogs ? copyLogs : null,
+                  child: const Text('Скопировать логи'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: AppConfig.enableNetworkLogs ? clearLogs : null,
+                  child: const Text('Очистить логи'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 180),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SelectableText(
+              AppConfig.enableNetworkLogs
+                  ? (logs.isEmpty ? 'Пока логов нет' : logs)
+                  : 'Сетевое логирование отключено для этой сборки',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = filteredVideos;
@@ -301,29 +441,7 @@ class _VideoListScreenState extends State<VideoListScreen> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                          child: TextField(
-                            decoration: InputDecoration(
-                              hintText: 'Поиск по видео',
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: searchQuery.isEmpty
-                                  ? null
-                                  : IconButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          searchQuery = '';
-                                        });
-                                      },
-                                      icon: const Icon(Icons.clear),
-                                      tooltip: 'Очистить',
-                                    ),
-                              border: const OutlineInputBorder(),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                searchQuery = value;
-                              });
-                            },
-                          ),
+                          child: _buildSearchField(),
                         ),
                         Expanded(
                           child: filtered.isEmpty
@@ -391,6 +509,7 @@ class _VideoListScreenState extends State<VideoListScreen> {
                                   ),
                                 ),
                         ),
+                        _buildDebugLogs(),
                       ],
                     ),
     );
