@@ -52,7 +52,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
       setState(() {
         error = NetworkErrorMapper.map(
           e,
-          fallbackMessage: 'Не удалось загрузить список live-стримов.',
+          fallbackMessage: 'Failed to load live streams.',
         );
         loading = false;
       });
@@ -69,12 +69,10 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
     return streams.where((item) {
       final title = item.title.toLowerCase();
       final owner = (item.ownerName ?? '').toLowerCase();
-      final streamKey = item.streamKey.toLowerCase();
       final description = (item.description ?? '').toLowerCase();
 
       return title.contains(query) ||
           owner.contains(query) ||
-          streamKey.contains(query) ||
           description.contains(query);
     }).toList();
   }
@@ -84,7 +82,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
 
     if (hlsUrl.isEmpty) {
       setState(() {
-        error = 'Для выбранного стрима отсутствует HLS URL.';
+        error = 'HLS URL is missing for the selected stream.';
       });
       return;
     }
@@ -118,12 +116,12 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
   Widget _buildSearch() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
       ),
       child: TextField(
         decoration: InputDecoration(
-          hintText: 'Поиск по live',
+          hintText: 'Search by title or owner',
           hintStyle: const TextStyle(color: Colors.white54),
           prefixIcon: const Icon(Icons.search, color: Colors.white70),
           suffixIcon: searchQuery.isEmpty
@@ -158,7 +156,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Ничего не найдено',
+                'Nothing found',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
@@ -168,7 +166,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
                     searchQuery = '';
                   });
                 },
-                child: const Text('Сбросить поиск'),
+                child: const Text('Clear search'),
               ),
             ],
           ),
@@ -203,7 +201,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: loadStreams,
-                  child: const Text('Повторить'),
+                  child: const Text('Retry'),
                 ),
               ],
             ),
@@ -215,7 +213,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
     if (streams.isEmpty) {
       return const Expanded(
         child: Center(
-          child: Text('Сейчас нет live-стримов'),
+          child: Text('No live streams now'),
         ),
       );
     }
@@ -243,7 +241,6 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Status: ${item.status}'),
                     if ((item.ownerName ?? '').isNotEmpty)
                       Text('Owner: ${item.ownerName}'),
                     Text('Started: ${_formatStartedAt(item.startedAt)}'),

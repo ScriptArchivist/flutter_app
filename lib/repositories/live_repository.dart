@@ -22,12 +22,17 @@ class LiveRepository {
   LiveRepository(this.dio);
 
   Future<Map<String, dynamic>> createSession({
+    String? title,
     String? streamKey,
     int ttlSeconds = 1800,
   }) async {
     final data = <String, dynamic>{
       'ttl_seconds': ttlSeconds,
     };
+
+    if (title != null && title.trim().isNotEmpty) {
+      data['title'] = title.trim();
+    }
 
     if (streamKey != null && streamKey.trim().isNotEmpty) {
       data['stream_key'] = streamKey.trim();

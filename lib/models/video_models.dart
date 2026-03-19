@@ -65,9 +65,7 @@ class ActiveLiveListItem {
     return ActiveLiveListItem(
       id: _tryParseInt(json['id']),
       streamKey: rawStreamKey,
-      title: rawTitle.isNotEmpty
-          ? rawTitle
-          : (rawStreamKey.isNotEmpty ? 'Live $rawStreamKey' : 'Live'),
+      title: rawTitle.isNotEmpty ? rawTitle : 'Live',
       description: json['description']?.toString(),
       status: (json['status']?.toString().trim().isNotEmpty ?? false)
           ? json['status'].toString().trim()

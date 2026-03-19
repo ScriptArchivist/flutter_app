@@ -45,6 +45,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
   LiveRepository get liveRepository => widget.liveRepository;
 
+  final TextEditingController _titleController = TextEditingController();
+
   CameraController? cameraController;
   List<CameraDescription> cameras = [];
   int currentCameraIndex = 0;
@@ -97,6 +99,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _titleController.dispose();
     _cameraInitGeneration += 1;
     _stopPolling();
     _stopStatsMonitoring();
@@ -205,7 +208,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         });
         _setViewState(
           LiveViewState.failed,
-          errorMessage: 'Нужны разрешения на камеру и микрофон',
+          errorMessage: 'Camera and microphone permissions are required for live streaming.',
         );
         return;
       }
@@ -220,7 +223,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
         });
         _setViewState(
           LiveViewState.failed,
-          errorMessage: 'Камера не найдена',
+          errorMessage: 'Camera not found',
         );
         return;
       }
@@ -255,7 +258,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       if (!mounted || generation != _cameraInitGeneration) return;
       _setViewState(
         LiveViewState.failed,
-        errorMessage: 'Не удалось инициализировать live: $e',
+        errorMessage: 'Failed to initialize live: $e',
       );
     }
   }
@@ -316,7 +319,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
     final mapped = NetworkErrorMapper.map(
       error,
-      fallbackMessage: 'Не удалось запустить трансляцию.',
+      fallbackMessage: 'Failed to start live stream.',
     );
 
     final raw = error.toString().trim();
@@ -324,8 +327,8 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       return mapped;
     }
 
-    if (mapped == 'Не удалось запустить трансляцию.') {
-      return 'Не удалось запустить трансляцию: $raw';
+    if (mapped == 'Failed to start live stream.') {
+      return 'Failed to start live stream: $raw';
     }
 
     return '$mapped\n$raw';
@@ -516,7 +519,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
         _setViewState(
           LiveViewState.failed,
-          errorMessage: error ?? 'Не удалось обновить статус live-сессии.',
+          errorMessage: error ?? 'Failed to refresh live session status.',
         );
         return;
       }
@@ -774,7 +777,16 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     if (controller == null || !cameraInitialized) {
       _setViewState(
         LiveViewState.failed,
-        errorMessage: 'Камера ещё не инициализирована',
+        errorMessage: 'Camera is not initialized yet',
+      );
+      return;
+    }
+
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Enter stream title',
       );
       return;
     }
@@ -797,7 +809,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     try {
       _logLiveStep('START REQUESTED');
 
-      final res = await liveRepository.createSession();
+      final res = await liveRepository.createSession(title: title);
       _logLiveStep('SESSION CREATED');
 
       if (!mounted) return;
@@ -931,7 +943,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       setState(() {
         error = NetworkErrorMapper.map(
           e,
-          fallbackMessage: 'Не удалось остановить трансляцию.',
+          fallbackMessage: 'Failed to stop live stream.',
         );
         loading = false;
         _viewState = LiveViewState.failed;
@@ -959,7 +971,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       _setViewState(
         LiveViewState.failed,
-        errorMessage: 'Не удалось переключить камеру: $e',
+        errorMessage: 'Failed to switch camera: $e',
       );
     }
   }
@@ -984,7 +996,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       _setViewState(
         LiveViewState.failed,
-        errorMessage: 'Не удалось переключить микрофон: $e',
+        errorMessage: 'Failed to toggle microphone: $e',
       );
     }
   }
@@ -1009,7 +1021,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       _setViewState(
         LiveViewState.failed,
-        errorMessage: 'Не удалось переключить вспышку: $e',
+        errorMessage: 'Failed to toggle flash: $e',
       );
     }
   }
@@ -1031,35 +1043,28 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     return '$day.$month.$year $hour:$minute';
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text('$label: $value'),
-    );
-  }
-
   String _stateTitle() {
     switch (_viewState) {
       case LiveViewState.idle:
-        return 'Готово к запуску';
+        return 'Ready to start';
       case LiveViewState.preparingCamera:
-        return 'Подготовка камеры';
+        return 'Preparing camera';
       case LiveViewState.creatingSession:
-        return 'Создание live session';
+        return 'Creating live session';
       case LiveViewState.connectingRtmp:
-        return 'Подключение к RTMP';
+        return 'Connecting to RTMP';
       case LiveViewState.streaming:
-        return 'Поток запущен';
+        return 'Stream started';
       case LiveViewState.waitingForHls:
-        return 'Ожидание HLS потока';
+        return 'Waiting for HLS';
       case LiveViewState.live:
-        return 'Эфир идёт';
+        return 'Live is on';
       case LiveViewState.stopping:
-        return 'Остановка трансляции';
+        return 'Stopping stream';
       case LiveViewState.stopped:
-        return 'Трансляция остановлена';
+        return 'Stream stopped';
       case LiveViewState.failed:
-        return 'Ошибка live';
+        return 'Live error';
     }
   }
 
@@ -1094,6 +1099,20 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     if (_isTerminalSessionStatus(status)) return false;
 
     return true;
+  }
+
+  String _streamDisplayTitle() {
+    final title = session?['title']?.toString().trim();
+    if (title != null && title.isNotEmpty) {
+      return title;
+    }
+
+    final inputTitle = _titleController.text.trim();
+    if (inputTitle.isNotEmpty) {
+      return inputTitle;
+    }
+
+    return 'Untitled stream';
   }
 
   @override
@@ -1140,14 +1159,27 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.15),
+                  color: Colors.orange.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.orange),
                 ),
                 child: const Text(
-                  'Для live нужны разрешения на камеру и микрофон.',
+                  'Camera and microphone permissions are required for live streaming.',
                 ),
               ),
+            if (!permissionsGranted) const SizedBox(height: 16),
+            TextField(
+              controller: _titleController,
+              enabled: !isStreaming && !loading,
+              decoration: InputDecoration(
+                labelText: 'Stream title',
+                hintText: 'Enter stream title',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             if (cameraInitialized && cameraController != null) ...[
               const Text(
                 'Camera preview',
@@ -1191,26 +1223,43 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
                 ),
               ),
             if (hasSession || _viewState != LiveViewState.idle) ...[
-              Text(
-                _stateTitle(),
-                style: TextStyle(
-                  color: _stateColor(),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _streamDisplayTitle(),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _stateTitle(),
+                      style: TextStyle(
+                        color: _stateColor(),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (session?['started_at'] != null) ...[
+                      const SizedBox(height: 8),
+                      Text('Started: ${_formatDate(session?['started_at'])}'),
+                    ],
+                    if (session?['stopped_at'] != null) ...[
+                      const SizedBox(height: 8),
+                      Text('Stopped: ${_formatDate(session?['stopped_at'])}'),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-            ],
-            if (session != null) ...[
-              _infoRow('Статус', session?['status']?.toString() ?? '—'),
-              _infoRow('Stream key', session?['stream_key']?.toString() ?? '—'),
-              _infoRow('Начало', _formatDate(session?['started_at'])),
-              _infoRow('Истекает', _formatDate(session?['expires_at'])),
-              _infoRow('Остановлено', _formatDate(session?['stopped_at'])),
-              if (rtmpUrl != null && rtmpUrl!.isNotEmpty)
-                _infoRow('RTMP', rtmpUrl!),
-              if (hlsUrl != null && hlsUrl!.isNotEmpty)
-                _infoRow('HLS', hlsUrl!),
             ],
           ],
         ),
