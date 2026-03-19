@@ -175,6 +175,144 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
     );
   }
 
+  Widget _buildLivePreviewFallback() {
+    return Container(
+      color: Colors.white.withValues(alpha: 0.04),
+      child: const Center(
+        child: Icon(
+          Icons.live_tv,
+          color: Colors.white70,
+          size: 30,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLivePreview(ActiveLiveListItem item) {
+    final thumbnailUrl = item.thumbnailUrl?.trim() ?? '';
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 132,
+        height: 78,
+        color: Colors.black,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: thumbnailUrl.isNotEmpty
+                  ? Image.network(
+                      thumbnailUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) {
+                        return _buildLivePreviewFallback();
+                      },
+                    )
+                  : _buildLivePreviewFallback(),
+            ),
+            Positioned(
+              left: 6,
+              top: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'LIVE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLiveItem(ActiveLiveListItem item) {
+    final owner = (item.ownerName ?? '').trim();
+    final startedAt = _formatStartedAt(item.startedAt);
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => openLiveItem(item),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildLivePreview(item),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if ((item.description ?? '').trim().isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          item.description!.trim(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      if (owner.isNotEmpty)
+                        Text(
+                          'Owner: $owner',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      if (owner.isNotEmpty) const SizedBox(height: 2),
+                      Text(
+                        'Started: $startedAt',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildStateBlock() {
     final filtered = filteredStreams;
     final hasSearch = searchQuery.trim().isNotEmpty;
@@ -230,26 +368,7 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             final item = filtered[index];
-
-            return Card(
-              child: ListTile(
-                contentPadding: const EdgeInsets.all(16),
-                leading: const CircleAvatar(
-                  child: Icon(Icons.live_tv),
-                ),
-                title: Text(item.title),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if ((item.ownerName ?? '').isNotEmpty)
-                      Text('Owner: ${item.ownerName}'),
-                    Text('Started: ${_formatStartedAt(item.startedAt)}'),
-                  ],
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => openLiveItem(item),
-              ),
-            );
+            return _buildLiveItem(item);
           },
         ),
       ),

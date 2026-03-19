@@ -112,17 +112,31 @@ class LiveRepository {
     final map = _requireMap(raw);
 
     if (map['session'] is Map) {
+      final session = _requireMap(map['session']);
+      final normalizedSession = Map<String, dynamic>.from(session);
+
+      normalizedSession['thumbnail_url'] = _rewriteThumbnailUrl(
+        normalizedSession['thumbnail_url']?.toString(),
+      );
+
       return {
-        'session': _requireMap(map['session']),
+        'session': normalizedSession,
         'rtmp_url': _rewriteRtmpUrl(map['rtmp_url']?.toString()),
         'hls_url': _rewriteHlsUrl(map['hls_url']?.toString()),
+        'thumbnail_url': _rewriteThumbnailUrl(map['thumbnail_url']?.toString()),
       };
     }
 
+    final normalizedSession = Map<String, dynamic>.from(map);
+    normalizedSession['thumbnail_url'] = _rewriteThumbnailUrl(
+      normalizedSession['thumbnail_url']?.toString(),
+    );
+
     return {
-      'session': map,
+      'session': normalizedSession,
       'rtmp_url': _rewriteRtmpUrl(map['rtmp_url']?.toString()),
       'hls_url': _rewriteHlsUrl(map['hls_url']?.toString()),
+      'thumbnail_url': _rewriteThumbnailUrl(map['thumbnail_url']?.toString()),
     };
   }
 
@@ -157,6 +171,9 @@ class LiveRepository {
     final normalized = Map<String, dynamic>.from(raw);
 
     normalized['hls_url'] = _rewriteHlsUrl(raw['hls_url']?.toString());
+    normalized['thumbnail_url'] = _rewriteThumbnailUrl(
+      raw['thumbnail_url']?.toString(),
+    );
 
     return ActiveLiveListItem.fromJson(normalized);
   }
@@ -207,6 +224,43 @@ class LiveRepository {
   }
 
   String? _rewriteHlsUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.isEmpty) return rawUrl;
+
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return rawUrl;
+
+    final originBase = Uri.tryParse(AppConfig.originBaseUrl);
+    if (originBase == null || originBase.host.isEmpty) {
+      return rawUrl;
+    }
+
+    final hasHost = uri.host.isNotEmpty;
+    final host = uri.host.toLowerCase();
+
+    if (!hasHost) {
+      return Uri(
+        scheme: originBase.scheme.isEmpty ? 'http' : originBase.scheme,
+        host: originBase.host,
+        port: originBase.hasPort ? originBase.port : null,
+        path: uri.path.startsWith('/') ? uri.path : '/${uri.path}',
+        query: uri.hasQuery ? uri.query : null,
+      ).toString();
+    }
+
+    if (host != 'localhost' && host != '127.0.0.1') {
+      return rawUrl;
+    }
+
+    return Uri(
+      scheme: originBase.scheme.isEmpty ? 'http' : originBase.scheme,
+      host: originBase.host,
+      port: originBase.hasPort ? originBase.port : null,
+      path: uri.path,
+      query: uri.hasQuery ? uri.query : null,
+    ).toString();
+  }
+
+  String? _rewriteThumbnailUrl(String? rawUrl) {
     if (rawUrl == null || rawUrl.isEmpty) return rawUrl;
 
     final uri = Uri.tryParse(rawUrl);
