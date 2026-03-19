@@ -23,6 +23,10 @@ class VideoDetailScreen extends StatefulWidget {
 class _VideoDetailScreenState extends State<VideoDetailScreen> {
   VideoRepository get videoRepository => widget.videoRepository;
 
+  static const Color _titleColor = Color(0xFF4A5A73);
+  static const Color _primaryTextColor = Color(0xFFE0E0E0);
+  static const Color _secondaryTextColor = Color(0xFFB8B8B8);
+
   bool loading = true;
   bool actionLoading = false;
   String? error;
@@ -368,21 +372,26 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     return '—';
   }
 
-  Widget _metaChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 6),
-          Text(label),
-        ],
-      ),
+  Widget _metaText(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: _secondaryTextColor,
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              color: _secondaryTextColor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -394,6 +403,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
+          color: _titleColor,
         ),
       ),
     );
@@ -483,71 +493,84 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                   ),
                           ),
                         )
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (effectiveHlsReady && effectiveHlsUrl != null) ...[
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: HlsPlayer(url: effectiveHlsUrl),
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: constraints.maxHeight - 32,
                                 ),
-                                const SizedBox(height: 20),
-                              ] else ...[
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: const Text(
-                                    'Видео ещё подготавливается',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                              Text(
-                                titleText,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    SizedBox(
+                                      height: constraints.maxHeight * 0.18,
+                                    ),
+                                    if (effectiveHlsReady &&
+                                        effectiveHlsUrl != null) ...[
+                                      Center(
+                                        child: HlsPlayer(url: effectiveHlsUrl),
+                                      ),
+                                      const SizedBox(height: 24),
+                                    ] else ...[
+                                      Center(
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(20),
+                                          color: Colors.grey.shade100,
+                                          child: const Text(
+                                            'Видео ещё подготавливается',
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 24),
+                                    ],
+                                    Text(
+                                      titleText,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: _titleColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Wrap(
+                                      spacing: 16,
+                                      runSpacing: 10,
+                                      children: [
+                                        _metaText(
+                                          Icons.schedule_outlined,
+                                          formatDuration(currentVideo['duration']),
+                                        ),
+                                        _metaText(
+                                          Icons.person_outline,
+                                          formatOwner(currentVideo),
+                                        ),
+                                        _metaText(
+                                          Icons.calendar_today_outlined,
+                                          formatDateTime(currentVideo['uploaded_at']),
+                                        ),
+                                      ],
+                                    ),
+                                    if (descriptionText.isNotEmpty) ...[
+                                      const SizedBox(height: 24),
+                                      _sectionTitle('Описание'),
+                                      Text(
+                                        descriptionText,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          height: 1.5,
+                                          color: _primaryTextColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  _metaChip(
-                                    Icons.schedule_outlined,
-                                    formatDuration(currentVideo['duration']),
-                                  ),
-                                  _metaChip(
-                                    Icons.person_outline,
-                                    formatOwner(currentVideo),
-                                  ),
-                                  _metaChip(
-                                    Icons.calendar_today_outlined,
-                                    formatDateTime(currentVideo['uploaded_at']),
-                                  ),
-                                ],
-                              ),
-                              if (descriptionText.isNotEmpty) ...[
-                                const SizedBox(height: 24),
-                                _sectionTitle('Описание'),
-                                Text(
-                                  descriptionText,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
+                            );
+                          },
                         ),
     );
   }
