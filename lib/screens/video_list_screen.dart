@@ -66,6 +66,92 @@ class _VideoListScreenState extends State<VideoListScreen> {
     loadVideos();
   }
 
+  bool _hasOwnerInfo(Map<String, dynamic> video) {
+    final directCandidates = [
+      video['owner_name'],
+      video['created_by'],
+      video['uploaded_by'],
+      video['author'],
+      video['username'],
+    ];
+
+    for (final candidate in directCandidates) {
+      final value = candidate?.toString().trim() ?? '';
+      if (value.isNotEmpty && value != 'null') {
+        return true;
+      }
+    }
+
+    final owner = video['owner'];
+    if (owner is Map) {
+      final nestedCandidates = [
+        owner['name'],
+        owner['username'],
+        owner['login'],
+        owner['email'],
+      ];
+
+      for (final candidate in nestedCandidates) {
+        final value = candidate?.toString().trim() ?? '';
+        if (value.isNotEmpty && value != 'null') {
+          return true;
+        }
+      }
+    }
+
+    final user = video['user'];
+    if (user is Map) {
+      final nestedCandidates = [
+        user['name'],
+        user['username'],
+        user['login'],
+        user['email'],
+      ];
+
+      for (final candidate in nestedCandidates) {
+        final value = candidate?.toString().trim() ?? '';
+        if (value.isNotEmpty && value != 'null') {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> _enrichVideosWithOwner(
+    List<Map<String, dynamic>> items,
+  ) async {
+    final result = <Map<String, dynamic>>[];
+
+    for (final item in items) {
+      if (_hasOwnerInfo(item)) {
+        result.add(item);
+        continue;
+      }
+
+      final rawId = item['id'];
+      final videoId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+
+      if (videoId == null) {
+        result.add(item);
+        continue;
+      }
+
+      try {
+        final detail = await videoRepository.getVideo(videoId);
+        result.add({
+          ...item,
+          ...detail,
+        });
+      } catch (_) {
+        result.add(item);
+      }
+    }
+
+    return result;
+  }
+
   Future<void> loadVideos() async {
     if (mounted) {
       setState(() {
@@ -76,11 +162,12 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
     try {
       final result = await videoRepository.getVideos();
+      final enriched = await _enrichVideosWithOwner(result);
 
       if (!mounted) return;
 
       setState(() {
-        videos = result;
+        videos = enriched;
         error = null;
         loading = false;
       });
@@ -363,7 +450,6 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
   String _resolveOwner(Map<String, dynamic> video) {
     final directCandidates = [
-      video['owner'],
       video['owner_name'],
       video['created_by'],
       video['uploaded_by'],
@@ -373,8 +459,25 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
     for (final candidate in directCandidates) {
       final value = candidate?.toString().trim() ?? '';
-      if (value.isNotEmpty) {
+      if (value.isNotEmpty && value != 'null') {
         return value;
+      }
+    }
+
+    final owner = video['owner'];
+    if (owner is Map) {
+      final nestedCandidates = [
+        owner['name'],
+        owner['username'],
+        owner['login'],
+        owner['email'],
+      ];
+
+      for (final candidate in nestedCandidates) {
+        final value = candidate?.toString().trim() ?? '';
+        if (value.isNotEmpty && value != 'null') {
+          return value;
+        }
       }
     }
 
@@ -389,7 +492,7 @@ class _VideoListScreenState extends State<VideoListScreen> {
 
       for (final candidate in nestedCandidates) {
         final value = candidate?.toString().trim() ?? '';
-        if (value.isNotEmpty) {
+        if (value.isNotEmpty && value != 'null') {
           return value;
         }
       }
