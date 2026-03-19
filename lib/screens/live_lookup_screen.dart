@@ -389,26 +389,38 @@ class _LiveLookupScreenState extends State<LiveLookupScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildSearch(),
-            const SizedBox(height: 16),
-            if (loading && streams.isNotEmpty) ...[
-              const LinearProgressIndicator(),
-              const SizedBox(height: 12),
-            ],
-            if (hasInlineError) ...[
-              Text(
-                error!,
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 12),
-            ],
-            _buildStateBlock(),
-          ],
-        ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/live_background.png',
+            fit: BoxFit.cover,
+          ),
+          Container(
+            color: Colors.black.withOpacity(0.55),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildSearch(),
+                const SizedBox(height: 16),
+                if (loading && streams.isNotEmpty) ...[
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: 12),
+                ],
+                if (hasInlineError) ...[
+                  Text(
+                    error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _buildStateBlock(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -32,6 +32,8 @@ flutter:
   assets:
     - assets/icon.png
     - assets/login_background.png
+    - assets/videos_background.png
+    - assets/live_background.png
 
 flutter_icons:
   android: true

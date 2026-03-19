@@ -571,146 +571,88 @@ class _VideoListScreenState extends State<VideoListScreen> {
     final duration = formatDuration(video['duration']);
     final owner = _resolveOwner(video);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () {
-        final parsedId = id is int
-            ? id
-            : int.tryParse(
-                id?.toString() ?? '',
-              );
-        if (parsedId != null) {
-          openDetail(parsedId);
-        }
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildVideoThumbnail(video, duration),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title != null && title.isNotEmpty
-                          ? title
-                          : 'Без названия',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          height: 1.3,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Material(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            final parsedId = id is int
+                ? id
+                : int.tryParse(
+                    id?.toString() ?? '',
+                  );
+            if (parsedId != null) {
+              openDetail(parsedId);
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildVideoThumbnail(video, duration),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title != null && title.isNotEmpty
+                              ? title
+                              : 'Без названия',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(
-                      'Добавлено: $uploadedAt',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white54,
-                      ),
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Добавлено: $uploadedAt',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white54,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Кем добавлено: $owner',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Кем добавлено: $owner',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white54,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Padding(
-              padding: EdgeInsets.only(top: 24),
-              child: Icon(Icons.chevron_right),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDebugLogs() {
-    final logs = NetworkLogBuffer.text;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.white12),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ExpansionTile(
-        initiallyExpanded: showDebugLogs,
-        onExpansionChanged: (value) {
-          setState(() {
-            showDebugLogs = value;
-          });
-        },
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        title: const Text(
-          'Debug logs',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          AppConfig.enableNetworkLogs
-              ? 'Сетевое логирование включено'
-              : 'Сетевое логирование отключено',
-        ),
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: AppConfig.enableNetworkLogs ? copyLogs : null,
-                  child: const Text('Скопировать логи'),
+                const SizedBox(width: 4),
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: Icon(Icons.chevron_right),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: AppConfig.enableNetworkLogs ? clearLogs : null,
-                  child: const Text('Очистить логи'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 180),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: SelectableText(
-              AppConfig.enableNetworkLogs
-                  ? (logs.isEmpty ? 'Пока логов нет' : logs)
-                  : 'Сетевое логирование отключено для этой сборки',
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -750,38 +692,49 @@ class _VideoListScreenState extends State<VideoListScreen> {
           ),
         ],
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-              ? _buildErrorState()
-              : videos.isEmpty
-                  ? _buildEmptyState()
-                  : Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                          child: _buildSearchField(),
-                        ),
-                        Expanded(
-                          child: filtered.isEmpty
-                              ? _buildSearchEmptyState()
-                              : RefreshIndicator(
-                                  onRefresh: loadVideos,
-                                  child: ListView.separated(
-                                    itemCount: filtered.length,
-                                    separatorBuilder: (_, __) => Divider(
-                                      height: 1,
-                                      color: Colors.white.withOpacity(0.06),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/videos_background.png',
+            fit: BoxFit.cover,
+          ),
+          Container(
+            color: Colors.black.withOpacity(0.55),
+          ),
+          loading
+              ? const Center(child: CircularProgressIndicator())
+              : error != null
+                  ? _buildErrorState()
+                  : videos.isEmpty
+                      ? _buildEmptyState()
+                      : Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                              child: _buildSearchField(),
+                            ),
+                            Expanded(
+                              child: filtered.isEmpty
+                                  ? _buildSearchEmptyState()
+                                  : RefreshIndicator(
+                                      onRefresh: loadVideos,
+                                      child: ListView.separated(
+                                        itemCount: filtered.length,
+                                        separatorBuilder: (_, __) => Divider(
+                                          height: 1,
+                                          color: Colors.white.withOpacity(0.06),
+                                        ),
+                                        itemBuilder: (context, index) {
+                                          return _buildVideoItem(filtered[index]);
+                                        },
+                                      ),
                                     ),
-                                    itemBuilder: (context, index) {
-                                      return _buildVideoItem(filtered[index]);
-                                    },
-                                  ),
-                                ),
+                            ),
+                          ],
                         ),
-                        _buildDebugLogs(),
-                      ],
-                    ),
+        ],
+      ),
     );
   }
 }

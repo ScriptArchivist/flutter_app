@@ -117,45 +117,57 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
                 ),
               ),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (loading) const LinearProgressIndicator(),
-                  if (loading) const SizedBox(height: 12),
-                  if (error != null) ...[
-                    Text(
-                      error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: HlsPlayer(url: hlsUrl),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    effectiveTitle,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (description != '—') ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      description,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                        color: Colors.black87,
+          : Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.asset(
+                  'assets/live_background.png',
+                  fit: BoxFit.cover,
+                ),
+                Container(
+                  color: Colors.black.withOpacity(0.55),
+                ),
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (loading) const LinearProgressIndicator(),
+                      if (loading) const SizedBox(height: 12),
+                      if (error != null) ...[
+                        Text(
+                          error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: HlsPlayer(url: hlsUrl),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                      const SizedBox(height: 20),
+                      Text(
+                        effectiveTitle,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (description != '—') ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          description,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.5,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
     );
   }

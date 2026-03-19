@@ -1227,123 +1227,135 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!permissionsGranted)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange),
-                ),
-                child: const Text(
-                  'Camera and microphone permissions are required for live streaming.',
-                ),
-              ),
-            if (!permissionsGranted) const SizedBox(height: 16),
-            TextField(
-              controller: _titleController,
-              enabled: !isStreaming && !loading,
-              decoration: InputDecoration(
-                labelText: 'Stream title',
-                hintText: 'Enter stream title',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (cameraInitialized && cameraController != null) ...[
-              const Text(
-                'Camera preview',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              AspectRatio(
-                aspectRatio: cameraController!.value.aspectRatio,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: KeyedSubtree(
-                    key: ValueKey(_cameraPreviewVersion),
-                    child: CameraPreview(cameraController!),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            Row(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/live_background.png',
+            fit: BoxFit.cover,
+          ),
+          Container(
+            color: Colors.black.withOpacity(0.55),
+          ),
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _canStartLive ? startLive : null,
-                    child: const Text('Start live'),
+                if (!permissionsGranted)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: const Text(
+                      'Camera and microphone permissions are required for live streaming.',
+                    ),
+                  ),
+                if (!permissionsGranted) const SizedBox(height: 16),
+                TextField(
+                  controller: _titleController,
+                  enabled: !isStreaming && !loading,
+                  decoration: InputDecoration(
+                    labelText: 'Stream title',
+                    hintText: 'Enter stream title',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _canStopLive ? stopLive : null,
-                    child: const Text('Stop live'),
+                const SizedBox(height: 16),
+                if (cameraInitialized && cameraController != null) ...[
+                  const Text(
+                    'Camera preview',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (loading) const Center(child: CircularProgressIndicator()),
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  error!,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            if (hasSession || _viewState != LiveViewState.idle) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 12),
+                  AspectRatio(
+                    aspectRatio: cameraController!.value.aspectRatio,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: KeyedSubtree(
+                        key: ValueKey(_cameraPreviewVersion),
+                        child: CameraPreview(cameraController!),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Row(
                   children: [
-                    Text(
-                      _streamDisplayTitle(),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _canStartLive ? startLive : null,
+                        child: const Text('Start live'),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _stateTitle(),
-                      style: TextStyle(
-                        color: _stateColor(),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _canStopLive ? stopLive : null,
+                        child: const Text('Stop live'),
                       ),
                     ),
-                    if (session?['started_at'] != null) ...[
-                      const SizedBox(height: 8),
-                      Text('Started: ${_formatDate(session?['started_at'])}'),
-                    ],
-                    if (session?['stopped_at'] != null) ...[
-                      const SizedBox(height: 8),
-                      Text('Stopped: ${_formatDate(session?['stopped_at'])}'),
-                    ],
                   ],
                 ),
-              ),
-            ],
-          ],
-        ),
+                const SizedBox(height: 16),
+                if (loading) const Center(child: CircularProgressIndicator()),
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
+                if (hasSession || _viewState != LiveViewState.idle) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _streamDisplayTitle(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _stateTitle(),
+                          style: TextStyle(
+                            color: _stateColor(),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        if (session?['started_at'] != null) ...[
+                          const SizedBox(height: 8),
+                          Text('Started: ${_formatDate(session?['started_at'])}'),
+                        ],
+                        if (session?['stopped_at'] != null) ...[
+                          const SizedBox(height: 8),
+                          Text('Stopped: ${_formatDate(session?['stopped_at'])}'),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
