@@ -368,10 +368,34 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     return '—';
   }
 
-  Widget infoRow(String label, String value) {
+  Widget _metaChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text('$label: $value'),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -388,36 +412,45 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         playback?['hls_url']?.toString() ?? currentVideo?['hls_url']?.toString();
     final effectiveHlsReady =
         playback?['hls_ready'] == true || currentVideo?['hls_ready'] == true;
+    final titleText =
+        currentVideo?['title']?.toString().trim().isNotEmpty == true
+            ? currentVideo!['title'].toString().trim()
+            : 'Video #${widget.videoId}';
+    final descriptionText = currentVideo?['description']?.toString().trim() ?? '';
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(currentVideo?['title']?.toString() ?? 'Video #${widget.videoId}'),
-        actions: [
-          IconButton(
-            onPressed: actionLoading ? null : editVideo,
-            icon: const Icon(Icons.edit),
-            tooltip: 'Edit',
-          ),
-          IconButton(
-            onPressed: actionLoading ? null : deleteVideo,
-            icon: const Icon(Icons.delete),
-            tooltip: 'Delete',
-          ),
-          IconButton(
-            onPressed: (_requestInFlight || actionLoading)
-                ? null
-                : () {
-                    setState(() {
-                      loading = true;
-                      error = null;
-                    });
-                    loadVideo();
-                  },
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: isLandscape
+          ? null
+          : AppBar(
+              title: Text(titleText),
+              actions: [
+                IconButton(
+                  onPressed: actionLoading ? null : editVideo,
+                  icon: const Icon(Icons.edit),
+                  tooltip: 'Edit',
+                ),
+                IconButton(
+                  onPressed: actionLoading ? null : deleteVideo,
+                  icon: const Icon(Icons.delete),
+                  tooltip: 'Delete',
+                ),
+                IconButton(
+                  onPressed: (_requestInFlight || actionLoading)
+                      ? null
+                      : () {
+                          setState(() {
+                            loading = true;
+                            error = null;
+                          });
+                          loadVideo();
+                        },
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
@@ -433,66 +466,89 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                 )
               : currentVideo == null
                   ? const Center(child: Text('Видео не найдено'))
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (effectiveHlsReady && effectiveHlsUrl != null) ...[
-                            HlsPlayer(url: effectiveHlsUrl),
-                            const SizedBox(height: 16),
-                          ] else ...[
-                            const Text('HLS ещё не готов'),
-                            const SizedBox(height: 16),
-                          ],
-                          infoRow('Title', currentVideo['title']?.toString() ?? '—'),
-                          infoRow(
-                            'Description',
-                            currentVideo['description']?.toString().trim().isNotEmpty ==
-                                    true
-                                ? currentVideo['description'].toString()
-                                : '—',
+                  : isLandscape
+                      ? ColoredBox(
+                          color: Colors.black,
+                          child: SafeArea(
+                            child: effectiveHlsReady && effectiveHlsUrl != null
+                                ? HlsPlayer(
+                                    url: effectiveHlsUrl,
+                                    immersive: true,
+                                  )
+                                : const Center(
+                                    child: Text(
+                                      'Видео ещё не готово',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
                           ),
-                          infoRow('Status', currentVideo['status']?.toString() ?? '—'),
-                          infoRow(
-                            'Visibility',
-                            currentVideo['visibility']?.toString() ?? '—',
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (effectiveHlsReady && effectiveHlsUrl != null) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: HlsPlayer(url: effectiveHlsUrl),
+                                ),
+                                const SizedBox(height: 20),
+                              ] else ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Text(
+                                    'Видео ещё подготавливается',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                              Text(
+                                titleText,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _metaChip(
+                                    Icons.schedule_outlined,
+                                    formatDuration(currentVideo['duration']),
+                                  ),
+                                  _metaChip(
+                                    Icons.person_outline,
+                                    formatOwner(currentVideo),
+                                  ),
+                                  _metaChip(
+                                    Icons.calendar_today_outlined,
+                                    formatDateTime(currentVideo['uploaded_at']),
+                                  ),
+                                ],
+                              ),
+                              if (descriptionText.isNotEmpty) ...[
+                                const SizedBox(height: 24),
+                                _sectionTitle('Описание'),
+                                Text(
+                                  descriptionText,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                          infoRow(
-                            'Duration',
-                            formatDuration(currentVideo['duration']),
-                          ),
-                          infoRow(
-                            'Owner',
-                            formatOwner(currentVideo),
-                          ),
-                          infoRow(
-                            'Uploaded',
-                            formatDateTime(currentVideo['uploaded_at']),
-                          ),
-                          infoRow(
-                            'Processed',
-                            formatDateTime(currentVideo['processed_at']),
-                          ),
-                          infoRow(
-                            'HLS ready',
-                            (currentVideo['hls_ready'] == true).toString(),
-                          ),
-                          infoRow(
-                            'HLS URL',
-                            currentVideo['hls_url']?.toString() ?? '—',
-                          ),
-                          infoRow(
-                            'Playback HLS URL',
-                            playback?['hls_url']?.toString() ?? '—',
-                          ),
-                          infoRow(
-                            'Error',
-                            currentVideo['error_message']?.toString() ?? '—',
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
     );
   }
 }

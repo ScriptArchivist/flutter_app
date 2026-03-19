@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 enum HlsPlayerState {
@@ -45,6 +46,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
   @override
   void initState() {
     super.initState();
+    _applyImmersiveMode();
     _startInitialization();
   }
 
@@ -54,6 +56,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
 
     if (oldWidget.url != widget.url) {
       _reinitialize();
+    }
+
+    if (oldWidget.immersive != widget.immersive) {
+      _applyImmersiveMode();
     }
   }
 
@@ -69,6 +75,16 @@ class _HlsPlayerState extends State<HlsPlayer> {
       case TargetPlatform.macOS:
       case TargetPlatform.fuchsia:
         return false;
+    }
+  }
+
+  Future<void> _applyImmersiveMode() async {
+    if (kIsWeb) return;
+
+    if (widget.immersive) {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
   }
 
@@ -112,15 +128,15 @@ class _HlsPlayerState extends State<HlsPlayer> {
     unawaited(_initWithRetry(generation));
   }
 
-  Future<void> _initWithRetry(int generation) async {
+  Future<_InitAttemptResult> _initWithRetry(int generation) async {
     if (_shouldUseFallback) {
-      if (!mounted || generation != _initGeneration) return;
+      if (!mounted || generation != _initGeneration) return _InitAttemptResult.cancelled;
       setState(() {
         _unsupportedPlatform = true;
         _state = HlsPlayerState.error;
         _error = null;
       });
-      return;
+      return _InitAttemptResult.error;
     }
 
     while (mounted &&
@@ -131,10 +147,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
       _setPlayerState(HlsPlayerState.initializing);
 
       final result = await _tryInitializeOnce(generation);
-      if (!mounted || generation != _initGeneration) return;
+      if (!mounted || generation != _initGeneration) return _InitAttemptResult.cancelled;
 
       if (result == _InitAttemptResult.success) {
-        return;
+        return result;
       }
 
       if (result == _InitAttemptResult.streamNotReady) {
@@ -143,7 +159,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
             HlsPlayerState.streamNotReady,
             errorMessage: 'Live stream ещё подготавливается.',
           );
-          return;
+          return result;
         }
 
         _setPlayerState(
@@ -168,7 +184,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
           HlsPlayerState.error,
           errorMessage: _error ?? 'Не удалось инициализировать HLS player.',
         );
-        return;
+        return result;
       }
 
       final completer = Completer<void>();
@@ -180,6 +196,8 @@ class _HlsPlayerState extends State<HlsPlayer> {
       });
       await completer.future;
     }
+
+    return _InitAttemptResult.cancelled;
   }
 
   Future<_InitAttemptResult> _tryInitializeOnce(int generation) async {
@@ -298,7 +316,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
         color: Colors.black,
         child: Center(
           child: FittedBox(
-            fit: BoxFit.cover,
+            fit: BoxFit.contain,
             child: SizedBox(
               width: width,
               height: height,
@@ -314,7 +332,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
           controller.value.aspectRatio == 0
               ? (16 / 9)
               : controller.value.aspectRatio,
-      child: VideoPlayer(controller),
+      child: ColoredBox(
+        color: Colors.black,
+        child: VideoPlayer(controller),
+      ),
     );
   }
 
@@ -353,8 +374,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
             ),
             const SizedBox(height: 8),
             Text(message),
-            const SizedBox(height: 12),
-            SelectableText(widget.url),
+            if (!widget.immersive) ...[
+              const SizedBox(height: 12),
+              SelectableText(widget.url),
+            ],
             if (showRetry) ...[
               const SizedBox(height: 12),
               OutlinedButton(
@@ -512,6 +535,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
   void dispose() {
     _retryTimer?.cancel();
     _initGeneration += 1;
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     final controller = _controller;
     _controller = null;
@@ -523,7 +547,6 @@ class _HlsPlayerState extends State<HlsPlayer> {
     super.dispose();
   }
 }
-
 enum _InitAttemptResult {
   success,
   streamNotReady,

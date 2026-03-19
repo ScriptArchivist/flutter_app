@@ -87,50 +87,76 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
     return trimmed;
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text('$label: $value'),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final effectiveTitle = title.trim().isNotEmpty ? title.trim() : 'Live';
+    final description = _displayValue(status);
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(effectiveTitle),
-        actions: [
-          IconButton(
-            onPressed: loading ? null : refreshLive,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (loading) const LinearProgressIndicator(),
-            if (loading) const SizedBox(height: 12),
-            if (error != null) ...[
-              Text(
-                error!,
-                style: const TextStyle(color: Colors.red),
+      appBar: isLandscape
+          ? null
+          : AppBar(
+              title: Text(effectiveTitle),
+              actions: [
+                IconButton(
+                  onPressed: loading ? null : refreshLive,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
+      body: isLandscape
+          ? ColoredBox(
+              color: Colors.black,
+              child: SafeArea(
+                child: HlsPlayer(
+                  url: hlsUrl,
+                  immersive: true,
+                ),
               ),
-              const SizedBox(height: 12),
-            ],
-            HlsPlayer(url: hlsUrl),
-            const SizedBox(height: 16),
-            _infoRow('Title', effectiveTitle),
-            _infoRow('Status', _displayValue(status)),
-            _infoRow('HLS', _displayValue(hlsUrl)),
-          ],
-        ),
-      ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (loading) const LinearProgressIndicator(),
+                  if (loading) const SizedBox(height: 12),
+                  if (error != null) ...[
+                    Text(
+                      error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: HlsPlayer(url: hlsUrl),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    effectiveTitle,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (description != '—') ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 }
