@@ -276,15 +276,35 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Delete video'),
-          content: const Text('Are you sure you want to delete this video?'),
+          backgroundColor: const Color(0xFF171B22),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: Colors.white.withOpacity(0.08),
+            ),
+          ),
+          title: const Text(
+            'Delete video',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Are you sure you want to delete this video?',
+            style: TextStyle(color: Colors.white70),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Delete'),
             ),
           ],
@@ -305,7 +325,17 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Video deleted')),
+        SnackBar(
+          content: const Text(
+            'Video deleted',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF171B22),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
       );
 
       Navigator.of(context).pop(true);
