@@ -130,12 +130,16 @@ class _HlsPlayerState extends State<HlsPlayer> {
 
   Future<_InitAttemptResult> _initWithRetry(int generation) async {
     if (_shouldUseFallback) {
-      if (!mounted || generation != _initGeneration) return _InitAttemptResult.cancelled;
+      if (!mounted || generation != _initGeneration) {
+        return _InitAttemptResult.cancelled;
+      }
+
       setState(() {
         _unsupportedPlatform = true;
         _state = HlsPlayerState.error;
         _error = null;
       });
+
       return _InitAttemptResult.error;
     }
 
@@ -147,7 +151,9 @@ class _HlsPlayerState extends State<HlsPlayer> {
       _setPlayerState(HlsPlayerState.initializing);
 
       final result = await _tryInitializeOnce(generation);
-      if (!mounted || generation != _initGeneration) return _InitAttemptResult.cancelled;
+      if (!mounted || generation != _initGeneration) {
+        return _InitAttemptResult.cancelled;
+      }
 
       if (result == _InitAttemptResult.success) {
         return result;
@@ -314,9 +320,9 @@ class _HlsPlayerState extends State<HlsPlayer> {
 
       return ColoredBox(
         color: Colors.black,
-        child: Center(
+        child: SizedBox.expand(
           child: FittedBox(
-            fit: BoxFit.contain,
+            fit: BoxFit.cover,
             child: SizedBox(
               width: width,
               height: height,
@@ -547,6 +553,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
     super.dispose();
   }
 }
+
 enum _InitAttemptResult {
   success,
   streamNotReady,
