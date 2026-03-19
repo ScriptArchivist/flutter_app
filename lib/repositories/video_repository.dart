@@ -134,8 +134,11 @@ class VideoRepository {
   Map<String, dynamic> _normalizeVideoMap(Map<String, dynamic> map) {
     final normalized = Map<String, dynamic>.from(map);
 
-    normalized['hls_url'] = _rewriteHlsUrl(
+    normalized['hls_url'] = _rewriteUrlWithOriginBase(
       normalized['hls_url']?.toString(),
+    );
+    normalized['thumbnail_url'] = _rewriteUrlWithOriginBase(
+      normalized['thumbnail_url']?.toString(),
     );
 
     return normalized;
@@ -144,14 +147,14 @@ class VideoRepository {
   Map<String, dynamic> _normalizePlaybackMap(Map<String, dynamic> map) {
     final normalized = Map<String, dynamic>.from(map);
 
-    normalized['hls_url'] = _rewriteHlsUrl(
+    normalized['hls_url'] = _rewriteUrlWithOriginBase(
       normalized['hls_url']?.toString(),
     );
 
     return normalized;
   }
 
-  String? _rewriteHlsUrl(String? rawUrl) {
+  String? _rewriteUrlWithOriginBase(String? rawUrl) {
     if (rawUrl == null || rawUrl.isEmpty) return rawUrl;
 
     final uri = Uri.tryParse(rawUrl);

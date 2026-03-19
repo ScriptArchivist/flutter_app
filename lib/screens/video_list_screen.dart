@@ -331,6 +331,222 @@ class _VideoListScreenState extends State<VideoListScreen> {
     );
   }
 
+  String _resolveThumbnail(Map<String, dynamic> video) {
+    final primary = video['thumbnail_url']?.toString().trim();
+    if (primary != null && primary.isNotEmpty) {
+      return primary;
+    }
+
+    final candidates = [
+      video['thumbnail'],
+      video['thumb_url'],
+      video['thumb'],
+      video['preview_url'],
+      video['preview'],
+      video['image_url'],
+      video['image'],
+      video['poster_url'],
+      video['poster'],
+      video['cover_url'],
+      video['cover'],
+    ];
+
+    for (final candidate in candidates) {
+      final value = candidate?.toString().trim() ?? '';
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
+  }
+
+  String _resolveOwner(Map<String, dynamic> video) {
+    final directCandidates = [
+      video['owner'],
+      video['owner_name'],
+      video['created_by'],
+      video['uploaded_by'],
+      video['author'],
+      video['username'],
+    ];
+
+    for (final candidate in directCandidates) {
+      final value = candidate?.toString().trim() ?? '';
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    final user = video['user'];
+    if (user is Map) {
+      final nestedCandidates = [
+        user['name'],
+        user['username'],
+        user['login'],
+        user['email'],
+      ];
+
+      for (final candidate in nestedCandidates) {
+        final value = candidate?.toString().trim() ?? '';
+        if (value.isNotEmpty) {
+          return value;
+        }
+      }
+    }
+
+    return '—';
+  }
+
+  Widget _buildVideoThumbnail(Map<String, dynamic> video, String duration) {
+    final thumbnailUrl = _resolveThumbnail(video);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 132,
+        height: 78,
+        color: Colors.white.withOpacity(0.06),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: thumbnailUrl.isNotEmpty
+                  ? Image.network(
+                      thumbnailUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) {
+                        return const Center(
+                          child: Icon(
+                            Icons.video_library_outlined,
+                            color: Colors.white54,
+                            size: 28,
+                          ),
+                        );
+                      },
+                    )
+                  : const Center(
+                      child: Icon(
+                        Icons.video_library_outlined,
+                        color: Colors.white54,
+                        size: 28,
+                      ),
+                    ),
+            ),
+            Positioned(
+              right: 6,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.75),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  duration,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoItem(Map<String, dynamic> video) {
+    final id = video['id'];
+    final title = video['title']?.toString().trim();
+    final description = video['description']?.toString().trim() ?? '';
+    final uploadedAt = formatDateTime(video['uploaded_at']);
+    final duration = formatDuration(video['duration']);
+    final owner = _resolveOwner(video);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        final parsedId = id is int
+            ? id
+            : int.tryParse(
+                id?.toString() ?? '',
+              );
+        if (parsedId != null) {
+          openDetail(parsedId);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildVideoThumbnail(video, duration),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title != null && title.isNotEmpty
+                          ? title
+                          : 'Без названия',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      'Добавлено: $uploadedAt',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white54,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Кем добавлено: $owner',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Padding(
+              padding: EdgeInsets.only(top: 24),
+              child: Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDebugLogs() {
     final logs = NetworkLogBuffer.text;
 
@@ -450,61 +666,12 @@ class _VideoListScreenState extends State<VideoListScreen> {
                                   onRefresh: loadVideos,
                                   child: ListView.separated(
                                     itemCount: filtered.length,
-                                    separatorBuilder: (_, __) =>
-                                        const Divider(height: 1),
+                                    separatorBuilder: (_, __) => Divider(
+                                      height: 1,
+                                      color: Colors.white.withOpacity(0.06),
+                                    ),
                                     itemBuilder: (context, index) {
-                                      final video = filtered[index];
-                                      final id = video['id'];
-                                      final description = video['description']
-                                              ?.toString()
-                                              .trim() ??
-                                          '';
-                                      final uploadedAt =
-                                          formatDateTime(video['uploaded_at']);
-                                      final duration =
-                                          formatDuration(video['duration']);
-
-                                      return ListTile(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 8,
-                                        ),
-                                        title: Text(
-                                          video['title']
-                                                      ?.toString()
-                                                      .trim()
-                                                      .isNotEmpty ==
-                                                  true
-                                              ? video['title'].toString()
-                                              : 'Без названия',
-                                        ),
-                                        subtitle: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            if (description.isNotEmpty) ...[
-                                              const SizedBox(height: 6),
-                                              Text(description),
-                                            ],
-                                            const SizedBox(height: 8),
-                                            Text('Добавлено: $uploadedAt'),
-                                            Text('Длительность: $duration'),
-                                          ],
-                                        ),
-                                        trailing:
-                                            const Icon(Icons.chevron_right),
-                                        onTap: () {
-                                          final parsedId = id is int
-                                              ? id
-                                              : int.tryParse(
-                                                  id?.toString() ?? '',
-                                                );
-                                          if (parsedId != null) {
-                                            openDetail(parsedId);
-                                          }
-                                        },
-                                      );
+                                      return _buildVideoItem(filtered[index]);
                                     },
                                   ),
                                 ),
