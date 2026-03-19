@@ -484,6 +484,8 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                 ? HlsPlayer(
                                     url: effectiveHlsUrl,
                                     immersive: true,
+                                    allowSeeking: true,
+                                    allowQualitySelection: true,
                                   )
                                 : const Center(
                                     child: Text(
@@ -510,7 +512,11 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                                     if (effectiveHlsReady &&
                                         effectiveHlsUrl != null) ...[
                                       Center(
-                                        child: HlsPlayer(url: effectiveHlsUrl),
+                                        child: HlsPlayer(
+                                          url: effectiveHlsUrl,
+                                          allowSeeking: true,
+                                          allowQualitySelection: true,
+                                        ),
                                       ),
                                       const SizedBox(height: 24),
                                     ] else ...[
