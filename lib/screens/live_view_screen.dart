@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../repositories/live_repository.dart';
 import '../widgets/hls_player.dart';
@@ -39,6 +40,22 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
     streamKey = widget.streamKey;
     hlsUrl = widget.hlsUrl;
     status = widget.status;
+    _enableViewerOrientations();
+  }
+
+  Future<void> _enableViewerOrientations() async {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
+  }
+
+  Future<void> _restoreDefaultOrientations() async {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   Future<void> refreshLive() async {
@@ -88,87 +105,79 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
   }
 
   @override
+  void dispose() {
+    _restoreDefaultOrientations();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final effectiveTitle = title.trim().isNotEmpty ? title.trim() : 'Live';
     final description = _displayValue(status);
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
-      appBar: isLandscape
-          ? null
-          : AppBar(
-              title: Text(effectiveTitle),
-              actions: [
-                IconButton(
-                  onPressed: loading ? null : refreshLive,
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Refresh',
-                ),
-              ],
-            ),
-      body: isLandscape
-          ? ColoredBox(
-              color: Colors.black,
-              child: SafeArea(
-                child: HlsPlayer(
-                  url: hlsUrl,
-                  immersive: true,
-                ),
-              ),
-            )
-          : Stack(
-              fit: StackFit.expand,
+      appBar: AppBar(
+        title: Text(effectiveTitle),
+        actions: [
+          IconButton(
+            onPressed: loading ? null : refreshLive,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/live_background.png',
+            fit: BoxFit.cover,
+          ),
+          Container(
+            color: Colors.black.withOpacity(0.55),
+          ),
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Image.asset(
-                  'assets/live_background.png',
-                  fit: BoxFit.cover,
+                if (loading) const LinearProgressIndicator(),
+                if (loading) const SizedBox(height: 12),
+                if (error != null) ...[
+                  Text(
+                    error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: HlsPlayer(url: hlsUrl),
                 ),
-                Container(
-                  color: Colors.black.withOpacity(0.55),
-                ),
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (loading) const LinearProgressIndicator(),
-                      if (loading) const SizedBox(height: 12),
-                      if (error != null) ...[
-                        Text(
-                          error!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: HlsPlayer(url: hlsUrl),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        effectiveTitle,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (description != '—') ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          description,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ],
+                const SizedBox(height: 20),
+                Text(
+                  effectiveTitle,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (description != '—') ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.5,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
               ],
             ),
+          ),
+        ],
+      ),
     );
   }
 }

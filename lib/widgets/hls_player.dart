@@ -450,35 +450,53 @@ class _HlsPlayerState extends State<HlsPlayer> {
     }
   }
 
-  Widget _buildVideo(VideoPlayerController controller) {
-    if (widget.immersive) {
-      final size = controller.value.size;
-      final width = size.width <= 0 ? 16.0 : size.width;
-      final height = size.height <= 0 ? 9.0 : size.height;
+  double _effectiveAspectRatio(VideoPlayerController controller) {
+    final aspectRatio = controller.value.aspectRatio;
+    if (aspectRatio > 0) {
+      return aspectRatio;
+    }
 
+    final size = controller.value.size;
+    final width = size.width <= 0 ? 16.0 : size.width;
+    final height = size.height <= 0 ? 9.0 : size.height;
+
+    return width / height;
+  }
+
+  Widget _buildVideoContent(VideoPlayerController controller) {
+    return VideoPlayer(controller);
+  }
+
+  Widget _buildVideo(VideoPlayerController controller) {
+    final size = controller.value.size;
+    final rawWidth = size.width <= 0 ? 16.0 : size.width;
+    final rawHeight = size.height <= 0 ? 9.0 : size.height;
+
+    final fittedVideo = FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(
+        width: rawWidth,
+        height: rawHeight,
+        child: _buildVideoContent(controller),
+      ),
+    );
+
+    if (widget.immersive) {
       return ColoredBox(
         color: Colors.black,
         child: SizedBox.expand(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: width,
-              height: height,
-              child: VideoPlayer(controller),
-            ),
-          ),
+          child: fittedVideo,
         ),
       );
     }
 
     return AspectRatio(
-      aspectRatio:
-          controller.value.aspectRatio == 0
-              ? (16 / 9)
-              : controller.value.aspectRatio,
+      aspectRatio: rawWidth / rawHeight,
       child: ColoredBox(
         color: Colors.black,
-        child: VideoPlayer(controller),
+        child: SizedBox.expand(
+          child: fittedVideo,
+        ),
       ),
     );
   }
@@ -832,8 +850,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
               data: Theme.of(context).copyWith(
                 sliderTheme: SliderTheme.of(context).copyWith(
                   trackHeight: 1.6,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 4),
+                  overlayShape:
+                      const RoundSliderOverlayShape(overlayRadius: 8),
                   inactiveTrackColor: Colors.grey.withValues(alpha: 0.22),
                   activeTrackColor: Colors.grey.withValues(alpha: 0.62),
                   thumbColor: Colors.grey.shade500,
@@ -890,7 +910,9 @@ class _HlsPlayerState extends State<HlsPlayer> {
           Row(
             children: [
               _buildControlButton(
-                icon: controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                icon: controller.value.isPlaying
+                    ? Icons.pause
+                    : Icons.play_arrow,
                 onPressed: _togglePlayPause,
                 size: 16,
                 buttonSize: 32,
@@ -947,8 +969,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
                 data: Theme.of(context).copyWith(
                   sliderTheme: SliderTheme.of(context).copyWith(
                     trackHeight: 1.8,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 4),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 8),
                     inactiveTrackColor:
                         Colors.grey.shade500.withValues(alpha: 0.30),
                     activeTrackColor:
@@ -1014,15 +1038,17 @@ class _HlsPlayerState extends State<HlsPlayer> {
                 if (_canSeek) ...[
                   _buildControlButton(
                     icon: Icons.replay_10,
-                    onPressed: () => _seekRelative(const Duration(seconds: -10)),
+                    onPressed: () =>
+                        _seekRelative(const Duration(seconds: -10)),
                     size: 15,
                     buttonSize: 34,
                   ),
                   const SizedBox(width: 8),
                 ],
                 _buildControlButton(
-                  icon:
-                      controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                  icon: controller.value.isPlaying
+                      ? Icons.pause
+                      : Icons.play_arrow,
                   onPressed: _togglePlayPause,
                   size: 16,
                   buttonSize: 34,
