@@ -42,7 +42,6 @@ class _VideoListScreenState extends State<VideoListScreen> {
   LiveRepository get liveRepository => widget.liveRepository;
 
   bool loading = true;
-  bool showDebugLogs = false;
   String? error;
   List<Map<String, dynamic>> videos = [];
   String searchQuery = '';
@@ -229,6 +228,137 @@ class _VideoListScreenState extends State<VideoListScreen> {
     setState(() {
       NetworkLogBuffer.clear();
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Логи очищены')),
+    );
+  }
+
+  void openLogsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF121212),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, modalSetState) {
+            final logsEnabled = AppConfig.enableNetworkLogs;
+            final logsText = logsEnabled
+                ? (NetworkLogBuffer.text.isEmpty
+                    ? 'Пока логов нет'
+                    : NetworkLogBuffer.text)
+                : 'Сетевое логирование отключено';
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 12,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                ),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.72,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Icon(Icons.terminal, color: Colors.white70),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Логи приложения',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close),
+                            tooltip: 'Закрыть',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.tonalIcon(
+                            onPressed: logsEnabled
+                                ? () async {
+                                    await copyLogs();
+                                    if (!mounted) return;
+                                    modalSetState(() {});
+                                  }
+                                : null,
+                            icon: const Icon(Icons.copy_all),
+                            label: const Text('Копировать'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: logsEnabled
+                                ? () {
+                                    clearLogs();
+                                    modalSetState(() {});
+                                  }
+                                : null,
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Очистить'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.08),
+                            ),
+                          ),
+                          child: SingleChildScrollView(
+                            child: SelectableText(
+                              logsText,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.45,
+                                color: Colors.white70,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   String formatDuration(dynamic value) {
@@ -657,6 +787,58 @@ class _VideoListScreenState extends State<VideoListScreen> {
     );
   }
 
+  Widget _buildLogsButton() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Material(
+            color: Colors.black.withOpacity(0.72),
+            borderRadius: BorderRadius.circular(18),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: openLogsSheet,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.08),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.terminal,
+                      size: 18,
+                      color: Colors.white70,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      AppConfig.enableNetworkLogs
+                          ? 'Логи приложения'
+                          : 'Логи отключены',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = filteredVideos;
@@ -720,6 +902,7 @@ class _VideoListScreenState extends State<VideoListScreen> {
                                   : RefreshIndicator(
                                       onRefresh: loadVideos,
                                       child: ListView.separated(
+                                        padding: const EdgeInsets.only(bottom: 84),
                                         itemCount: filtered.length,
                                         separatorBuilder: (_, __) => Divider(
                                           height: 1,
@@ -733,6 +916,7 @@ class _VideoListScreenState extends State<VideoListScreen> {
                             ),
                           ],
                         ),
+          _buildLogsButton(),
         ],
       ),
     );

@@ -158,9 +158,18 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                     DropdownButtonFormField<String>(
                       value: selectedVisibility,
                       items: const [
-                        DropdownMenuItem(value: 'private', child: Text('private')),
-                        DropdownMenuItem(value: 'public', child: Text('public')),
-                        DropdownMenuItem(value: 'unlisted', child: Text('unlisted')),
+                        DropdownMenuItem(
+                          value: 'private',
+                          child: Text('private'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'public',
+                          child: Text('public'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'unlisted',
+                          child: Text('unlisted'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -206,11 +215,13 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
     final currentTitle = currentVideo['title']?.toString() ?? '';
     final currentDescription = currentVideo['description']?.toString() ?? '';
-    final currentVisibility = currentVideo['visibility']?.toString() ?? 'private';
+    final currentVisibility =
+        currentVideo['visibility']?.toString() ?? 'private';
 
     final newTitle = result['title']?.toString() ?? '';
     final newDescription = result['description']?.toString() ?? '';
-    final newVisibility = result['visibility']?.toString() ?? currentVisibility;
+    final newVisibility =
+        result['visibility']?.toString() ?? currentVisibility;
 
     final payload = <String, dynamic>{};
 
@@ -256,7 +267,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
       setState(() {
         error =
-            e.response?.data?.toString() ?? e.message ?? 'Failed to update video';
+            e.response?.data?.toString() ??
+            e.message ??
+            'Failed to update video';
         actionLoading = false;
       });
     } catch (e) {
@@ -344,7 +357,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
 
       setState(() {
         error =
-            e.response?.data?.toString() ?? e.message ?? 'Failed to delete video';
+            e.response?.data?.toString() ??
+            e.message ??
+            'Failed to delete video';
         actionLoading = false;
       });
     } catch (e) {
@@ -449,14 +464,16 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
   Widget build(BuildContext context) {
     final currentVideo = video;
     final effectiveHlsUrl =
-        playback?['hls_url']?.toString() ?? currentVideo?['hls_url']?.toString();
+        playback?['hls_url']?.toString() ??
+        currentVideo?['hls_url']?.toString();
     final effectiveHlsReady =
         playback?['hls_ready'] == true || currentVideo?['hls_ready'] == true;
     final titleText =
         currentVideo?['title']?.toString().trim().isNotEmpty == true
             ? currentVideo!['title'].toString().trim()
             : 'Video #${widget.videoId}';
-    final descriptionText = currentVideo?['description']?.toString().trim() ?? '';
+    final descriptionText =
+        currentVideo?['description']?.toString().trim() ?? '';
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
 
@@ -494,120 +511,117 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      error!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.red),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            )
+          : currentVideo == null
+          ? const Center(child: Text('Видео не найдено'))
+          : isLandscape
+          ? ColoredBox(
+              color: Colors.black,
+              child: effectiveHlsReady && effectiveHlsUrl != null
+                  ? HlsPlayer(
+                      url: effectiveHlsUrl,
+                      immersive: true,
+                      allowSeeking: true,
+                      allowQualitySelection: true,
+                    )
+                  : const Center(
+                      child: Text(
+                        'Видео ещё не готово',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 32,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: constraints.maxHeight * 0.18,
+                        ),
+                        if (effectiveHlsReady && effectiveHlsUrl != null) ...[
+                          Center(
+                            child: HlsPlayer(
+                              url: effectiveHlsUrl,
+                              allowSeeking: true,
+                              allowQualitySelection: true,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ] else ...[
+                          Center(
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              color: Colors.grey.shade100,
+                              child: const Text(
+                                'Видео ещё подготавливается',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        Text(
+                          titleText,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: _titleColor,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 16,
+                          runSpacing: 10,
+                          children: [
+                            _metaText(
+                              Icons.schedule_outlined,
+                              formatDuration(currentVideo['duration']),
+                            ),
+                            _metaText(
+                              Icons.person_outline,
+                              formatOwner(currentVideo),
+                            ),
+                            _metaText(
+                              Icons.calendar_today_outlined,
+                              formatDateTime(currentVideo['uploaded_at']),
+                            ),
+                          ],
+                        ),
+                        if (descriptionText.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          _sectionTitle('Описание'),
+                          Text(
+                            descriptionText,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.5,
+                              color: _primaryTextColor,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                )
-              : currentVideo == null
-                  ? const Center(child: Text('Видео не найдено'))
-                  : isLandscape
-                      ? ColoredBox(
-                          color: Colors.black,
-                          child: SafeArea(
-                            child: effectiveHlsReady && effectiveHlsUrl != null
-                                ? HlsPlayer(
-                                    url: effectiveHlsUrl,
-                                    immersive: true,
-                                    allowSeeking: true,
-                                    allowQualitySelection: true,
-                                  )
-                                : const Center(
-                                    child: Text(
-                                      'Видео ещё не готово',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                          ),
-                        )
-                      : LayoutBuilder(
-                          builder: (context, constraints) {
-                            return SingleChildScrollView(
-                              padding: const EdgeInsets.all(16),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minHeight: constraints.maxHeight - 32,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    SizedBox(
-                                      height: constraints.maxHeight * 0.18,
-                                    ),
-                                    if (effectiveHlsReady &&
-                                        effectiveHlsUrl != null) ...[
-                                      Center(
-                                        child: HlsPlayer(
-                                          url: effectiveHlsUrl,
-                                          allowSeeking: true,
-                                          allowQualitySelection: true,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 24),
-                                    ] else ...[
-                                      Center(
-                                        child: Container(
-                                          width: double.infinity,
-                                          padding: const EdgeInsets.all(20),
-                                          color: Colors.grey.shade100,
-                                          child: const Text(
-                                            'Видео ещё подготавливается',
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 24),
-                                    ],
-                                    Text(
-                                      titleText,
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: _titleColor,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 16,
-                                      runSpacing: 10,
-                                      children: [
-                                        _metaText(
-                                          Icons.schedule_outlined,
-                                          formatDuration(currentVideo['duration']),
-                                        ),
-                                        _metaText(
-                                          Icons.person_outline,
-                                          formatOwner(currentVideo),
-                                        ),
-                                        _metaText(
-                                          Icons.calendar_today_outlined,
-                                          formatDateTime(currentVideo['uploaded_at']),
-                                        ),
-                                      ],
-                                    ),
-                                    if (descriptionText.isNotEmpty) ...[
-                                      const SizedBox(height: 24),
-                                      _sectionTitle('Описание'),
-                                      Text(
-                                        descriptionText,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          height: 1.5,
-                                          color: _primaryTextColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                );
+              },
+            ),
     );
   }
 }

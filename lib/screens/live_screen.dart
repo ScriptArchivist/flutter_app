@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:rtmp_streaming/camera.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -95,6 +96,7 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_lockLiveOrientation());
     _resetScreenStateForEntry();
     unawaited(_initializeEverything());
   }
@@ -108,8 +110,24 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     _stopStatsMonitoring();
     _stopHlsAvailabilityCheck();
     unawaited(_disposeCameraOnly());
+    unawaited(_unlockOrientation());
     unawaited(WakelockPlus.disable());
     super.dispose();
+  }
+
+  Future<void> _lockLiveOrientation() async {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
+  }
+
+  Future<void> _unlockOrientation() async {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   void _resetScreenStateForEntry() {
@@ -331,6 +349,11 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
       (camera) => camera.lensDirection == CameraLensDirection.back,
     );
     return backIndex >= 0 ? backIndex : 0;
+  }
+
+  bool _isFrontCameraIndex(int index) {
+    if (index < 0 || index >= cameras.length) return false;
+    return cameras[index].lensDirection == CameraLensDirection.front;
   }
 
   Future<bool> _ensurePermissions() async {
@@ -1033,16 +1056,20 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
 
     final controller = cameraController;
     if (controller == null || !cameraInitialized) return;
-    if (isStreaming || loading) return;
+    if (loading) return;
 
     try {
       final nextIndex = (currentCameraIndex + 1) % cameras.length;
+
       await controller.switchCamera(cameras[nextIndex].name!);
 
       if (!mounted) return;
 
       setState(() {
         currentCameraIndex = nextIndex;
+        if (_isFrontCameraIndex(currentCameraIndex)) {
+          flashEnabled = false;
+        }
         _cameraPreviewVersion += 1;
       });
     } catch (e) {
@@ -1082,6 +1109,15 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
   Future<void> toggleFlash() async {
     final controller = cameraController;
     if (controller == null) return;
+
+    if (_isFrontCameraIndex(currentCameraIndex)) {
+      if (!mounted) return;
+      _setViewState(
+        LiveViewState.failed,
+        errorMessage: 'Flash is not available for the front camera.',
+      );
+      return;
+    }
 
     try {
       final newValue = !flashEnabled;
@@ -1200,9 +1236,11 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Live producer'),
+        backgroundColor: Colors.black54,
+        elevation: 0,
         actions: [
           IconButton(
-            onPressed: cameras.length > 1 && cameraInitialized && !isStreaming
+            onPressed: cameras.length > 1 && cameraInitialized && !loading
                 ? switchCamera
                 : null,
             icon: const Icon(Icons.cameraswitch),
@@ -1214,7 +1252,10 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
             tooltip: 'Toggle microphone',
           ),
           IconButton(
-            onPressed: permissionsGranted ? toggleFlash : null,
+            onPressed: permissionsGranted &&
+                    !_isFrontCameraIndex(currentCameraIndex)
+                ? toggleFlash
+                : null,
             icon: Icon(flashEnabled ? Icons.flash_on : Icons.flash_off),
             tooltip: 'Toggle flash',
           ),
@@ -1227,132 +1268,155 @@ class _LiveScreenState extends State<LiveScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Image.asset(
-            'assets/live_background.png',
-            fit: BoxFit.cover,
+          Container(
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/live_producer_background.png'),
+                fit: BoxFit.cover,
+              ),
+            ),
           ),
           Container(
             color: Colors.black.withOpacity(0.55),
           ),
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!permissionsGranted)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!permissionsGranted)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange),
+                      ),
+                      child: const Text(
+                        'Camera and microphone permissions are required for live streaming.',
+                      ),
                     ),
-                    child: const Text(
-                      'Camera and microphone permissions are required for live streaming.',
-                    ),
-                  ),
-                if (!permissionsGranted) const SizedBox(height: 16),
-                TextField(
-                  controller: _titleController,
-                  enabled: !isStreaming && !loading,
-                  decoration: InputDecoration(
-                    labelText: 'Stream title',
-                    hintText: 'Enter stream title',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (cameraInitialized && cameraController != null) ...[
-                  const Text(
-                    'Camera preview',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  AspectRatio(
-                    aspectRatio: cameraController!.value.aspectRatio,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: KeyedSubtree(
-                        key: ValueKey(_cameraPreviewVersion),
-                        child: CameraPreview(cameraController!),
+                  if (!permissionsGranted) const SizedBox(height: 16),
+                  TextField(
+                    controller: _titleController,
+                    enabled: !isStreaming && !loading,
+                    decoration: InputDecoration(
+                      labelText: 'Stream title',
+                      hintText: 'Enter stream title',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                ],
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _canStartLive ? startLive : null,
-                        child: const Text('Start live'),
+                  if (cameraInitialized && cameraController != null) ...[
+                    const Text(
+                      'Camera preview',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        color: Colors.black,
+                        child: AspectRatio(
+                          aspectRatio: 9 / 16,
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            child: SizedBox(
+                              width: 1080,
+                              height: 1920,
+                              child: KeyedSubtree(
+                                key: ValueKey(_cameraPreviewVersion),
+                                child: CameraPreview(cameraController!),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _canStopLive ? stopLive : null,
-                        child: const Text('Stop live'),
+                    const SizedBox(height: 16),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _canStartLive ? startLive : null,
+                          child: const Text('Start live'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _canStopLive ? stopLive : null,
+                          child: const Text('Stop live'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (loading) const Center(child: CircularProgressIndicator()),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        error!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  if (hasSession || _viewState != LiveViewState.idle) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _streamDisplayTitle(),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _stateTitle(),
+                            style: TextStyle(
+                              color: _stateColor(),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                          if (session?['started_at'] != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Started: ${_formatDate(session?['started_at'])}',
+                            ),
+                          ],
+                          if (session?['stopped_at'] != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Stopped: ${_formatDate(session?['stopped_at'])}',
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                if (loading) const Center(child: CircularProgressIndicator()),
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      error!,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                if (hasSession || _viewState != LiveViewState.idle) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _streamDisplayTitle(),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _stateTitle(),
-                          style: TextStyle(
-                            color: _stateColor(),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                        ),
-                        if (session?['started_at'] != null) ...[
-                          const SizedBox(height: 8),
-                          Text('Started: ${_formatDate(session?['started_at'])}'),
-                        ],
-                        if (session?['stopped_at'] != null) ...[
-                          const SizedBox(height: 8),
-                          Text('Stopped: ${_formatDate(session?['stopped_at'])}'),
-                        ],
-                      ],
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
           ),
         ],

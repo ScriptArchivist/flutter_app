@@ -18,7 +18,8 @@ dependencies:
   mime: ^1.0.5
   file_picker: ^8.1.2
   permission_handler: ^11.3.1
-  rtmp_streaming: 1.0.3
+  rtmp_streaming:
+    path: third_party/rtmp_streaming
   wakelock_plus: ^1.2.8
 
 dev_dependencies:
@@ -34,6 +35,7 @@ flutter:
     - assets/login_background.png
     - assets/videos_background.png
     - assets/live_background.png
+    - assets/live_producer_background.png
 
 flutter_icons:
   android: true
