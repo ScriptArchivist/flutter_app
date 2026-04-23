@@ -64,6 +64,9 @@ class _HlsPlayerState extends State<HlsPlayer> {
   bool _isDraggingSlider = false;
   double? _dragValueMs;
 
+  double _volume = 1.0;
+  double _previousVolumeBeforeMute = 1.0;
+
   @override
   void initState() {
     super.initState();
@@ -108,6 +111,16 @@ class _HlsPlayerState extends State<HlsPlayer> {
   bool get _canSeek {
     if (!widget.allowSeeking) return false;
     return _duration > Duration.zero;
+  }
+
+  IconData get _volumeIcon {
+    if (_volume <= 0.001) {
+      return Icons.volume_off;
+    }
+    if (_volume < 0.5) {
+      return Icons.volume_down;
+    }
+    return Icons.volume_up;
   }
 
   Future<void> _applyImmersiveMode() async {
@@ -280,6 +293,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
       }
 
       await controller.setLooping(false);
+      await controller.setVolume(_volume);
       controller.addListener(_onControllerChanged);
 
       if (widget.autoplay) {
@@ -518,6 +532,39 @@ class _HlsPlayerState extends State<HlsPlayer> {
     }
   }
 
+  Future<void> _setVolume(double nextVolume) async {
+    final controller = _controller;
+    final clamped = nextVolume.clamp(0.0, 1.0);
+
+    if (clamped > 0) {
+      _previousVolumeBeforeMute = clamped;
+    }
+
+    if (controller != null) {
+      await controller.setVolume(clamped);
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _volume = clamped;
+    });
+
+    _showControls();
+  }
+
+  Future<void> _toggleMute() async {
+    if (_volume <= 0.001) {
+      final restoreValue = _previousVolumeBeforeMute <= 0.001
+          ? 1.0
+          : _previousVolumeBeforeMute;
+      await _setVolume(restoreValue);
+    } else {
+      _previousVolumeBeforeMute = _volume;
+      await _setVolume(0);
+    }
+  }
+
   Future<void> _seekTo(Duration position) async {
     final controller = _controller;
     if (controller == null || !_canSeek) return;
@@ -566,6 +613,14 @@ class _HlsPlayerState extends State<HlsPlayer> {
     bool showRetry = true,
   }) {
     return Card(
+      color: const Color(0xFF161B22),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: Colors.white.withOpacity(0.08),
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -576,18 +631,34 @@ class _HlsPlayerState extends State<HlsPlayer> {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 8),
-            Text(message),
+            Text(
+              message,
+              style: const TextStyle(color: Colors.white70),
+            ),
             if (!widget.immersive) ...[
               const SizedBox(height: 12),
-              SelectableText(widget.url),
+              SelectableText(
+                widget.url,
+                style: const TextStyle(color: Colors.white60),
+              ),
             ],
             if (showRetry) ...[
               const SizedBox(height: 12),
               OutlinedButton(
                 onPressed: _reinitialize,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(
+                    color: Colors.white.withOpacity(0.14),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 child: const Text('Retry'),
               ),
             ],
@@ -718,6 +789,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
 
     final selectedUrl = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: const Color(0xFF121821),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       builder: (context) {
         return SafeArea(
           child: Column(
@@ -726,8 +801,13 @@ class _HlsPlayerState extends State<HlsPlayer> {
               final selected = option.url == (_selectedQualityUrl ?? widget.url);
 
               return ListTile(
-                title: Text(option.label),
-                trailing: selected ? const Icon(Icons.check) : null,
+                title: Text(
+                  option.label,
+                  style: const TextStyle(color: Colors.white),
+                ),
+                trailing: selected
+                    ? const Icon(Icons.check, color: Colors.white)
+                    : null,
                 onTap: () => Navigator.of(context).pop(option.url),
               );
             }).toList(),
@@ -757,6 +837,7 @@ class _HlsPlayerState extends State<HlsPlayer> {
       final controller = VideoPlayerController.networkUrl(Uri.parse(nextUrl));
       await controller.initialize().timeout(_initializeTimeout);
       await controller.setLooping(false);
+      await controller.setVolume(_volume);
       controller.addListener(_onControllerChanged);
 
       final duration = controller.value.duration;
@@ -814,8 +895,11 @@ class _HlsPlayerState extends State<HlsPlayer> {
       width: buttonSize,
       height: buttonSize,
       decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.black.withOpacity(0.34),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+        ),
       ),
       child: IconButton(
         padding: EdgeInsets.zero,
@@ -826,6 +910,64 @@ class _HlsPlayerState extends State<HlsPlayer> {
           color: Colors.grey.shade200,
         ),
       ),
+    );
+  }
+
+  Widget _buildVolumeRow({required bool immersive}) {
+    final iconColor = immersive ? Colors.grey.shade300 : Colors.grey.shade500;
+    final inactiveColor = immersive
+        ? Colors.grey.shade500.withOpacity(0.28)
+        : Colors.grey.withOpacity(0.18);
+    final activeColor = immersive
+        ? Colors.grey.shade300.withOpacity(0.92)
+        : Colors.grey.shade700.withOpacity(0.55);
+    final thumbColor = immersive ? Colors.grey.shade300 : Colors.grey.shade600;
+
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: _toggleMute,
+          child: Icon(
+            _volumeIcon,
+            size: 18,
+            color: iconColor,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: immersive ? 1.8 : 1.6,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+              inactiveTrackColor: inactiveColor,
+              activeTrackColor: activeColor,
+              thumbColor: thumbColor,
+              overlayColor: activeColor.withOpacity(0.14),
+            ),
+            child: Slider(
+              value: _volume.clamp(0.0, 1.0),
+              min: 0,
+              max: 1,
+              onChanged: (value) async {
+                await _setVolume(value);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 34,
+          child: Text(
+            '${(_volume * 100).round()}%',
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 11,
+              color: iconColor,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -840,8 +982,23 @@ class _HlsPlayerState extends State<HlsPlayer> {
     final safeMax = durationMs <= 0 ? 1.0 : durationMs;
     final safeValue = positionMs.clamp(0.0, safeMax);
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141922),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.07),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -854,10 +1011,10 @@ class _HlsPlayerState extends State<HlsPlayer> {
                       const RoundSliderThumbShape(enabledThumbRadius: 4),
                   overlayShape:
                       const RoundSliderOverlayShape(overlayRadius: 8),
-                  inactiveTrackColor: Colors.grey.withValues(alpha: 0.22),
-                  activeTrackColor: Colors.grey.withValues(alpha: 0.62),
+                  inactiveTrackColor: Colors.grey.withOpacity(0.20),
+                  activeTrackColor: Colors.grey.withOpacity(0.56),
                   thumbColor: Colors.grey.shade500,
-                  overlayColor: Colors.grey.withValues(alpha: 0.08),
+                  overlayColor: Colors.grey.withOpacity(0.08),
                 ),
               ),
               child: Slider(
@@ -906,7 +1063,9 @@ class _HlsPlayerState extends State<HlsPlayer> {
                 ],
               ),
             ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 8),
+          _buildVolumeRow(immersive: false),
+          const SizedBox(height: 10),
           Row(
             children: [
               _buildControlButton(
@@ -959,8 +1118,17 @@ class _HlsPlayerState extends State<HlsPlayer> {
       right: 0,
       bottom: 0,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
-        color: Colors.transparent,
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.0),
+              Colors.black.withOpacity(0.72),
+            ],
+          ),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -974,12 +1142,12 @@ class _HlsPlayerState extends State<HlsPlayer> {
                     overlayShape:
                         const RoundSliderOverlayShape(overlayRadius: 8),
                     inactiveTrackColor:
-                        Colors.grey.shade500.withValues(alpha: 0.30),
+                        Colors.grey.shade500.withOpacity(0.30),
                     activeTrackColor:
-                        Colors.grey.shade300.withValues(alpha: 0.92),
-                    thumbColor: Colors.grey.shade500,
+                        Colors.grey.shade300.withOpacity(0.92),
+                    thumbColor: Colors.grey.shade300,
                     overlayColor:
-                        Colors.grey.shade300.withValues(alpha: 0.12),
+                        Colors.grey.shade300.withOpacity(0.12),
                   ),
                 ),
                 child: Slider(
@@ -1031,7 +1199,9 @@ class _HlsPlayerState extends State<HlsPlayer> {
                   ],
                 ),
               ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
+            _buildVolumeRow(immersive: true),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -1079,6 +1249,15 @@ class _HlsPlayerState extends State<HlsPlayer> {
                     buttonSize: 34,
                   ),
                 ],
+                const SizedBox(width: 8),
+                _buildControlButton(
+                  icon: _controlsVisible
+                      ? Icons.visibility_off_outlined
+                      : Icons.tune,
+                  onPressed: _toggleControlsVisibility,
+                  size: 15,
+                  buttonSize: 34,
+                ),
                 if (_isBuffering || _isQualityLoading) ...[
                   const SizedBox(width: 8),
                   SizedBox(
@@ -1101,22 +1280,110 @@ class _HlsPlayerState extends State<HlsPlayer> {
   }
 
   Widget _buildCenterPlayButton(VideoPlayerController controller) {
-    return Center(
-      child: GestureDetector(
-        onTap: _togglePlayPause,
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: Colors.grey.withValues(alpha: 0.24),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-            color: Colors.grey.shade200,
-            size: 26,
+    return IgnorePointer(
+      child: Center(
+        child: AnimatedOpacity(
+          opacity: _controlsVisible ? 1 : 0,
+          duration: const Duration(milliseconds: 180),
+          child: Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.28),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.10),
+              ),
+            ),
+            child: Icon(
+              controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.grey.shade200,
+              size: 28,
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNormalPlayer() {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _togglePlayPause,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                _buildVideo(controller),
+                AnimatedOpacity(
+                  opacity: controller.value.isPlaying ? 0.0 : 1.0,
+                  duration: const Duration(milliseconds: 180),
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.32),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.10),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      size: 34,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        _buildVerticalControls(controller),
+      ],
+    );
+  }
+
+  Widget _buildImmersivePlayer() {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _togglePlayPause,
+      onLongPress: _toggleControlsVisibility,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ColoredBox(
+              color: Colors.black,
+              child: _buildVideo(controller),
+            ),
+          ),
+          _buildCenterPlayButton(controller),
+          if (_controlsVisible) _buildImmersiveBottomControls(controller),
+        ],
       ),
     );
   }
@@ -1125,6 +1392,14 @@ class _HlsPlayerState extends State<HlsPlayer> {
   Widget build(BuildContext context) {
     if (_unsupportedPlatform) {
       return Card(
+        color: const Color(0xFF161B22),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: Colors.white.withOpacity(0.08),
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -1135,18 +1410,24 @@ class _HlsPlayerState extends State<HlsPlayer> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'В этой сборке Linux/Web встроенный HLS player не поддерживается.',
+                style: TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Backend playback уже готов. Этот URL можно проверить на Android-сборке:',
+                style: TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 8),
-              SelectableText(widget.url),
+              SelectableText(
+                widget.url,
+                style: const TextStyle(color: Colors.white60),
+              ),
             ],
           ),
         ),
@@ -1178,42 +1459,11 @@ class _HlsPlayerState extends State<HlsPlayer> {
       );
     }
 
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
     if (widget.immersive) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _toggleControlsVisibility,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: ColoredBox(
-                color: Colors.black,
-                child: _buildVideo(controller),
-              ),
-            ),
-            if (_controlsVisible) _buildCenterPlayButton(controller),
-            if (_controlsVisible) _buildImmersiveBottomControls(controller),
-          ],
-        ),
-      );
+      return _buildImmersivePlayer();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildVideo(controller),
-        _buildVerticalControls(controller),
-      ],
-    );
+    return _buildNormalPlayer();
   }
 
   @override

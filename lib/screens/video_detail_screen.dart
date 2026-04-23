@@ -23,9 +23,11 @@ class VideoDetailScreen extends StatefulWidget {
 class _VideoDetailScreenState extends State<VideoDetailScreen> {
   VideoRepository get videoRepository => widget.videoRepository;
 
-  static const Color _titleColor = Color(0xFF4A5A73);
-  static const Color _primaryTextColor = Color(0xFFE0E0E0);
-  static const Color _secondaryTextColor = Color(0xFFB8B8B8);
+  static const Color _titleColor = Color(0xFFEAF1FF);
+  static const Color _primaryTextColor = Color(0xFFD8E0F0);
+  static const Color _secondaryTextColor = Color(0xFF9CA8BF);
+  static const Color _surfaceColor = Color(0xFF131A24);
+  static const Color _surfaceBorderColor = Color(0x1AFFFFFF);
 
   bool loading = true;
   bool actionLoading = false;
@@ -130,7 +132,17 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Edit video'),
+          backgroundColor: const Color(0xFF171E29),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Colors.white.withOpacity(0.08),
+            ),
+          ),
+          title: const Text(
+            'Edit video',
+            style: TextStyle(color: Colors.white),
+          ),
           content: StatefulBuilder(
             builder: (context, setModalState) {
               return SingleChildScrollView(
@@ -139,24 +151,34 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                   children: [
                     TextField(
                       controller: titleController,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
                         labelText: 'Title',
-                        border: OutlineInputBorder(),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: descriptionController,
+                      style: const TextStyle(color: Colors.white),
                       minLines: 2,
                       maxLines: 4,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Description',
-                        border: OutlineInputBorder(),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: selectedVisibility,
+                      dropdownColor: const Color(0xFF171E29),
+                      style: const TextStyle(color: Colors.white),
                       items: const [
                         DropdownMenuItem(
                           value: 'private',
@@ -178,9 +200,12 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                           });
                         }
                       },
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Visibility',
-                        border: OutlineInputBorder(),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                   ],
@@ -191,7 +216,10 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -201,6 +229,10 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                   'visibility': selectedVisibility,
                 });
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7C91FF),
+                foregroundColor: Colors.white,
+              ),
               child: const Text('Save'),
             ),
           ],
@@ -260,7 +292,17 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Video updated')),
+        SnackBar(
+          content: const Text(
+            'Video updated',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: const Color(0xFF171B22),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
       );
     } on DioException catch (e) {
       if (!mounted) return;
@@ -417,40 +459,68 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     return '—';
   }
 
-  Widget _metaText(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 16,
-          color: _secondaryTextColor,
-        ),
-        const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: _secondaryTextColor,
+  Widget _metaChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF171E29),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _surfaceBorderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: _secondaryTextColor,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                color: _secondaryTextColor,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _sectionTitle(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         text,
         style: const TextStyle(
           fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: _titleColor,
         ),
       ),
+    );
+  }
+
+  Widget _glassCard({required Widget child, EdgeInsets? padding}) {
+    return Container(
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _surfaceColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: _surfaceBorderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.22),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 
@@ -478,9 +548,12 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0B1017),
       appBar: isLandscape
           ? null
           : AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
               title: Text(titleText),
               actions: [
                 IconButton(
@@ -508,6 +581,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                 ),
               ],
             ),
+      extendBodyBehindAppBar: !isLandscape,
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : error != null
@@ -540,87 +614,149 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                       ),
                     ),
             )
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 32,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          height: constraints.maxHeight * 0.18,
-                        ),
-                        if (effectiveHlsReady && effectiveHlsUrl != null) ...[
-                          Center(
-                            child: HlsPlayer(
-                              url: effectiveHlsUrl,
-                              allowSeeking: true,
-                              allowQualitySelection: true,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                        ] else ...[
-                          Center(
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(20),
-                              color: Colors.grey.shade100,
-                              child: const Text(
-                                'Видео ещё подготавливается',
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
+          : Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          const Color(0xFF111826),
+                          const Color(0xFF0B1017),
                         ],
-                        Text(
-                          titleText,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: _titleColor,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 16,
-                          runSpacing: 10,
-                          children: [
-                            _metaText(
-                              Icons.schedule_outlined,
-                              formatDuration(currentVideo['duration']),
-                            ),
-                            _metaText(
-                              Icons.person_outline,
-                              formatOwner(currentVideo),
-                            ),
-                            _metaText(
-                              Icons.calendar_today_outlined,
-                              formatDateTime(currentVideo['uploaded_at']),
-                            ),
-                          ],
-                        ),
-                        if (descriptionText.isNotEmpty) ...[
-                          const SizedBox(height: 24),
-                          _sectionTitle('Описание'),
-                          Text(
-                            descriptionText,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              height: 1.5,
-                              color: _primaryTextColor,
-                            ),
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
-                );
-              },
+                ),
+                Positioned(
+                  top: -120,
+                  left: -40,
+                  child: Container(
+                    width: 220,
+                    height: 220,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF7C91FF).withOpacity(0.10),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 120,
+                  right: -50,
+                  child: Container(
+                    width: 180,
+                    height: 180,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.cyanAccent.withOpacity(0.06),
+                    ),
+                  ),
+                ),
+                SafeArea(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final topSpacing = constraints.maxHeight * 0.08;
+
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(10, 12, 10, 28),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight - 20,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(height: topSpacing),
+                              _glassCard(
+                                padding: const EdgeInsets.all(10),
+                                child: effectiveHlsReady && effectiveHlsUrl != null
+                                    ? HlsPlayer(
+                                        url: effectiveHlsUrl,
+                                        allowSeeking: true,
+                                        allowQualitySelection: true,
+                                      )
+                                    : Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(28),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF0E141D),
+                                          borderRadius: BorderRadius.circular(18),
+                                        ),
+                                        child: const Text(
+                                          'Видео ещё подготавливается',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                              const SizedBox(height: 18),
+                              _glassCard(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      titleText,
+                                      style: const TextStyle(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800,
+                                        color: _titleColor,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    Wrap(
+                                      spacing: 10,
+                                      runSpacing: 10,
+                                      children: [
+                                        _metaChip(
+                                          Icons.schedule_outlined,
+                                          formatDuration(currentVideo['duration']),
+                                        ),
+                                        _metaChip(
+                                          Icons.person_outline,
+                                          formatOwner(currentVideo),
+                                        ),
+                                        _metaChip(
+                                          Icons.calendar_today_outlined,
+                                          formatDateTime(currentVideo['uploaded_at']),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (descriptionText.isNotEmpty) ...[
+                                const SizedBox(height: 18),
+                                _glassCard(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _sectionTitle('Описание'),
+                                      Text(
+                                        descriptionText,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          height: 1.6,
+                                          color: _primaryTextColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
     );
   }

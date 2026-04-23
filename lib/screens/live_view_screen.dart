@@ -104,6 +104,26 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
     return trimmed;
   }
 
+  Widget _glassCard({required Widget child, EdgeInsets? padding}) {
+    return Container(
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131A24),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.24),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
   @override
   void dispose() {
     _restoreDefaultOrientations();
@@ -116,7 +136,10 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
     final description = _displayValue(status);
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0B1017),
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Text(effectiveTitle),
         actions: [
           IconButton(
@@ -126,6 +149,7 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
           ),
         ],
       ),
+      extendBodyBehindAppBar: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -134,46 +158,142 @@ class _LiveViewScreenState extends State<LiveViewScreen> {
             fit: BoxFit.cover,
           ),
           Container(
-            color: Colors.black.withOpacity(0.55),
-          ),
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (loading) const LinearProgressIndicator(),
-                if (loading) const SizedBox(height: 12),
-                if (error != null) ...[
-                  Text(
-                    error!,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                  const SizedBox(height: 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.38),
+                  const Color(0xFF0B1017).withOpacity(0.88),
                 ],
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: HlsPlayer(url: hlsUrl),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  effectiveTitle,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (description != '—') ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    description,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.5,
-                      color: Colors.black87,
+              ),
+            ),
+          ),
+          Positioned(
+            top: -100,
+            left: -40,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.redAccent.withOpacity(0.08),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 110,
+            right: -60,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.cyanAccent.withOpacity(0.06),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final topSpacing = constraints.maxHeight * 0.10;
+
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(10, 12, 10, 28),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: topSpacing),
+                        if (loading) ...[
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: const LinearProgressIndicator(),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (error != null) ...[
+                          _glassCard(
+                            child: Text(
+                              error!,
+                              style: const TextStyle(color: Colors.redAccent),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        _glassCard(
+                          padding: const EdgeInsets.all(10),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: HlsPlayer(url: hlsUrl),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _glassCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.redAccent.withOpacity(0.45),
+                                          blurRadius: 10,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Text(
+                                    'LIVE',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.1,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                effectiveTitle,
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFFEAF1FF),
+                                  height: 1.15,
+                                ),
+                              ),
+                              if (description != '—') ...[
+                                const SizedBox(height: 14),
+                                Text(
+                                  description,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    height: 1.6,
+                                    color: Color(0xFFD8E0F0),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ],
+                );
+              },
             ),
           ),
         ],
