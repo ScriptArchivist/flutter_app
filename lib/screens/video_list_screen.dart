@@ -213,7 +213,20 @@ class _VideoListScreenState extends State<VideoListScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Логи скопированы')),
+      SnackBar(
+        content: const Text(
+          'Логи скопированы',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF121212),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: Colors.white24,
+          ),
+        ),
+      ),
     );
   }
 
@@ -240,7 +253,7 @@ class _VideoListScreenState extends State<VideoListScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
           side: BorderSide(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white24,
           ),
         ),
       ),
