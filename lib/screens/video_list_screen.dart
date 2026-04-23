@@ -230,7 +230,20 @@ class _VideoListScreenState extends State<VideoListScreen> {
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Логи очищены')),
+      SnackBar(
+        content: const Text(
+          'Логи очищены',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF121212),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: Colors.white.withOpacity(0.08),
+          ),
+        ),
+      ),
     );
   }
 
