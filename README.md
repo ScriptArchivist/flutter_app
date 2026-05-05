@@ -65,6 +65,8 @@
 ---
 
 ## 🏗 Архитектура
+
+
 lib/
 ├── screens/
 │ ├── video_list_screen.dart
@@ -88,6 +90,7 @@ lib/
 └── config/
 └── app_config.dart
 
+
 ---
 
 ## ⚙️ Зависимости
@@ -108,9 +111,6 @@ lib/
 ```bash
 flutter pub get
 flutter run
-
----
-
 📱 Платформы
 Платформа	Поддержка
 Android	✅ Полная
