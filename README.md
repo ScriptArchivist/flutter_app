@@ -1,63 +1,79 @@
-# Flutter Video Platform Client
+# 📹 Flutter Video Platform Client
 
-Mobile client for the Video Platform backend.
+Клиентское приложение для видеоплатформы с поддержкой:
 
-The app supports video upload, HLS playback, live streaming, and basic video management.
+- загрузки видео;
+- воспроизведения HLS;
+- Live Streaming (RTMP → HLS);
+- управления видео.
 
 ---
 
-## Screenshots
+## Скриншоты
 
 <p align="center">
-  <img src="lib/images/app_overview.png" width="1000" alt="Screenshots">
+  <img src="lib/images/app_overview.png" width="1000" alt="Скриншоты приложения">
 </p>
 
 ---
 
-## Features
+## 🚀 Возможности
 
-### Video
+### 🎬 Видео
 
-- Video list with search
-- Video details screen
-- HLS playback
-- Quality selection
-- Video metadata display:
-  - duration
-  - upload date
-  - author
+- Список видео с поиском
+- Просмотр деталей видео
+- HLS-воспроизведение
+- Поддержка выбора качества (Adaptive Streaming)
+- Отображение:
+  - длительности;
+  - даты загрузки;
+  - автора.
 
-### Upload
+### ⬆️ Загрузка видео
 
-- Pick video file with file_picker
-- Create video metadata
-- Upload file through upload API
-- Poll processing status
-- Navigate to playback screen when video is ready
+- Выбор файла через `file_picker`
+- Создание видео (metadata)
+- Загрузка файла через Upload API
+- Автоматический polling статуса:
+  - uploading;
+  - processing;
+  - ready.
+- Автоматический переход на экран просмотра после завершения обработки.
 
-### Live streaming
+### 🔴 Live Streaming
 
-- Camera capture
-- RTMP streaming to backend
-- Live session creation
-- HLS availability check
-- Live stream status tracking
+- Захват камеры (через `rtmp_streaming`)
+- RTMP-стрим на backend
+- Автоматическое создание live-сессии
+- Проверка доступности HLS (latency tracking)
+- Статистика стрима:
+  - bitrate;
+  - fps;
+  - отправленные байты.
 
-### HLS Player
+### 📺 HLS Player
 
-Custom HLS player based on video_player:
+Кастомный плеер на базе `video_player`:
 
-- retry when stream is not ready
-- stream-not-ready state handling
-- quality switching
-- seeking support
-- volume control
-- immersive mode
-- Linux/Web fallback
+- автоматический retry при недоступном потоке;
+- обработка состояния **stream not ready**;
+- переключение качества;
+- seek (если разрешён);
+- управление громкостью;
+- immersive mode (fullscreen без UI);
+- fallback для Linux/Web.
+
+### 🧪 Debug
+
+- встроенный буфер сетевых логов;
+- просмотр логов из интерфейса;
+- копирование логов;
+- очистка логов.
 
 ---
 
-## Architecture
+## 🏗 Архитектура
 
 ```text
 lib/
@@ -69,10 +85,10 @@ lib/
 │   └── live_lookup_screen.dart
 │
 ├── repositories/
-│   ├── auth_repository.dart
 │   ├── video_repository.dart
 │   ├── upload_repository.dart
-│   └── live_repository.dart
+│   ├── live_repository.dart
+│   └── auth_repository.dart
 │
 ├── core/
 │   └── network/
@@ -86,19 +102,20 @@ lib/
 
 ---
 
-## Tech stack
+## ⚙️ Используемые библиотеки
 
-- Flutter
-- Dio
-- video_player
-- rtmp_streaming
-- file_picker
-- permission_handler
-- wakelock_plus
+Основные зависимости:
+
+- `dio` — HTTP-клиент;
+- `video_player` — воспроизведение видео;
+- `rtmp_streaming` — Live Streaming (кастомный пакет);
+- `file_picker` — выбор файлов;
+- `permission_handler` — доступ к камере и микрофону;
+- `wakelock_plus` — предотвращение перехода устройства в режим сна во время стрима.
 
 ---
 
-## Run
+## ▶️ Запуск проекта
 
 ```bash
 flutter pub get
@@ -107,9 +124,9 @@ flutter run
 
 ---
 
-## Configuration
+## ⚙️ Конфигурация
 
-The backend URLs are configured through dart-define values:
+Адреса backend-сервисов передаются через `dart-define`:
 
 ```text
 IDENTITY_BASE_URL
@@ -120,7 +137,7 @@ ORIGIN_BASE_URL
 ENABLE_NETWORK_LOGS
 ```
 
-Example:
+Пример запуска:
 
 ```bash
 flutter run \
@@ -133,43 +150,68 @@ flutter run \
 
 ---
 
-## Supported platforms
+## 📱 Поддерживаемые платформы
 
-| Platform | Status |
-| -------- | ------ |
-| Android | Supported |
-| iOS | Supported |
-| Linux | Fallback for HLS playback |
-| Web | Limited support |
+| Платформа | Поддержка |
+| ---------- | --------- |
+| Android | ✅ Полная |
+| iOS | ✅ Полная |
+| Linux | ⚠️ Fallback для HLS |
+| Web | ⚠️ Ограниченная |
 
 ---
 
-## Upload flow
+## 🔥 Как работает Live Streaming
+
+1. Создаётся live-сессия через API.
+2. Клиент получает `rtmp_url`.
+3. Камера начинает RTMP-стрим.
+4. Backend конвертирует поток в HLS.
+5. Клиент:
+   - проверяет доступность HLS;
+   - измеряет latency.
+6. После готовности поток переходит в состояние **LIVE**.
+
+---
+
+## 📡 Поток загрузки видео
 
 ```text
-createVideo -> initUpload -> uploadFile -> completeUpload -> polling -> ready
+createVideo
+    ↓
+initUpload
+    ↓
+uploadFile
+    ↓
+completeUpload
+    ↓
+polling
+    ↓
+ready
 ```
 
 ---
 
-## Live flow
+## ⚠️ Особенности
 
-```text
-createSession -> RTMP publish -> backend HLS output -> HLS availability check -> live
-```
-
----
-
-## Related project
-
-Backend repository:
-
-<https://github.com/ScriptArchivist/learning>
+- Используется polling вместо WebSocket.
+- HLS может быть недоступен сразу после запуска — реализован механизм retry.
+- Linux и Web не поддерживают нативное HLS-воспроизведение, используется fallback.
+- Задержка Live Streaming определяется клиентом через проверку доступности HLS.
 
 ---
 
-## Status
+## 📌 TODO
 
-Active portfolio project.
+- [ ] Перейти с polling на WebSocket.
+- [ ] Вынести state management (Riverpod / Bloc).
+- [ ] Добавить кэширование списка видео.
+- [ ] Улучшить обработку ошибок.
+- [ ] Добавить offline-режим.
+- [ ] Добавить превью Live Stream.
 
-This app is part of a multi-platform video platform with FastAPI backend, web client, and Flutter mobile client.
+---
+
+## 👨‍💻 Автор
+
+Проект разработан как Flutter-клиент для собственной видеоплатформы с backend на FastAPI.
