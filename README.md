@@ -6,6 +6,14 @@ The app supports video upload, HLS playback, live streaming, and basic video man
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="lib/images/app_overview.png" width="1000" alt="Screenshots">
+</p>
+
+---
+
 ## Features
 
 ### Video
@@ -51,28 +59,30 @@ Custom HLS player based on video_player:
 
 ## Architecture
 
-    lib/
-    ├── screens/
-    │   ├── video_list_screen.dart
-    │   ├── video_detail_screen.dart
-    │   ├── upload_screen.dart
-    │   ├── live_screen.dart
-    │   └── live_lookup_screen.dart
-    │
-    ├── repositories/
-    │   ├── auth_repository.dart
-    │   ├── video_repository.dart
-    │   ├── upload_repository.dart
-    │   └── live_repository.dart
-    │
-    ├── core/
-    │   └── network/
-    │
-    ├── widgets/
-    │   └── hls_player.dart
-    │
-    └── config/
-        └── app_config.dart
+```text
+lib/
+├── screens/
+│   ├── video_list_screen.dart
+│   ├── video_detail_screen.dart
+│   ├── upload_screen.dart
+│   ├── live_screen.dart
+│   └── live_lookup_screen.dart
+│
+├── repositories/
+│   ├── auth_repository.dart
+│   ├── video_repository.dart
+│   ├── upload_repository.dart
+│   └── live_repository.dart
+│
+├── core/
+│   └── network/
+│
+├── widgets/
+│   └── hls_player.dart
+│
+└── config/
+    └── app_config.dart
+```
 
 ---
 
@@ -90,8 +100,10 @@ Custom HLS player based on video_player:
 
 ## Run
 
-    flutter pub get
-    flutter run
+```bash
+flutter pub get
+flutter run
+```
 
 ---
 
@@ -99,28 +111,32 @@ Custom HLS player based on video_player:
 
 The backend URLs are configured through dart-define values:
 
-    IDENTITY_BASE_URL
-    VIDEO_BASE_URL
-    UPLOAD_BASE_URL
-    LIVE_BASE_URL
-    ORIGIN_BASE_URL
-    ENABLE_NETWORK_LOGS
+```text
+IDENTITY_BASE_URL
+VIDEO_BASE_URL
+UPLOAD_BASE_URL
+LIVE_BASE_URL
+ORIGIN_BASE_URL
+ENABLE_NETWORK_LOGS
+```
 
 Example:
 
-    flutter run \
-      --dart-define=IDENTITY_BASE_URL=http://192.168.1.12:8001 \
-      --dart-define=VIDEO_BASE_URL=http://192.168.1.12:8003/api/v1 \
-      --dart-define=UPLOAD_BASE_URL=http://192.168.1.12:8002/api/v1 \
-      --dart-define=LIVE_BASE_URL=http://192.168.1.12:8004 \
-      --dart-define=ORIGIN_BASE_URL=http://192.168.1.12:8080
+```bash
+flutter run \
+  --dart-define=IDENTITY_BASE_URL=http://192.168.1.12:8001 \
+  --dart-define=VIDEO_BASE_URL=http://192.168.1.12:8003/api/v1 \
+  --dart-define=UPLOAD_BASE_URL=http://192.168.1.12:8002/api/v1 \
+  --dart-define=LIVE_BASE_URL=http://192.168.1.12:8004 \
+  --dart-define=ORIGIN_BASE_URL=http://192.168.1.12:8080
+```
 
 ---
 
 ## Supported platforms
 
 | Platform | Status |
-|---|---|
+| -------- | ------ |
 | Android | Supported |
 | iOS | Supported |
 | Linux | Fallback for HLS playback |
@@ -130,13 +146,17 @@ Example:
 
 ## Upload flow
 
-    createVideo -> initUpload -> uploadFile -> completeUpload -> polling -> ready
+```text
+createVideo -> initUpload -> uploadFile -> completeUpload -> polling -> ready
+```
 
 ---
 
 ## Live flow
 
-    createSession -> RTMP publish -> backend HLS output -> HLS availability check -> live
+```text
+createSession -> RTMP publish -> backend HLS output -> HLS availability check -> live
+```
 
 ---
 
@@ -144,7 +164,7 @@ Example:
 
 Backend repository:
 
-    https://github.com/ScriptArchivist/learning
+<https://github.com/ScriptArchivist/learning>
 
 ---
 
